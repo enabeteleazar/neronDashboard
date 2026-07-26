@@ -23,7 +23,7 @@ import {
   type SystemResources,
 } from './lib/neronApi';
 
-type WindowId = 'conversation' | 'dashboard' | 'homelab' | 'vocal' | 'goals' | 'memory' | 'wikipedia';
+type WindowId = 'conversation' | 'dashboard' | 'homelab' | 'vocal' | 'goals' | 'memory' | 'wikipedia' | 'instagram' | 'internet' | 'x' | 'facebook' | 'youtube';
 
 type WindowRuntimeState = {
   x: number;
@@ -41,7 +41,12 @@ const initialLayout: Record<WindowId, Omit<WindowRuntimeState, 'z' | 'minimized'
   vocal: { x: 1010, y: 610, width: 390 },
   goals: { x: 760, y: 560, width: 370 },
   memory: { x: 760, y: 120, width: 370 },
-  wikipedia: { x: 480, y: 160, width: 520 },
+  wikipedia: { x: 940, y: 100, width: 460 },
+  internet: { x: 940, y: 100, width: 460 },
+  facebook: { x: 1420, y: 100, width: 460 },
+  instagram: { x: 1420, y: 320, width: 460 },
+  x: { x: 1420, y: 540, width: 460 },
+  youtube: { x: 1420, y: 760, width: 460 },
 };
 
 const titles: Record<WindowId, string> = {
@@ -52,6 +57,11 @@ const titles: Record<WindowId, string> = {
   goals: 'Goals',
   memory: 'Mémoire',
   wikipedia: 'Wikipédia',
+  instagram: 'Instagram',
+  internet: 'Internet',
+  x: 'X',
+  facebook: 'Facebook',
+  youtube: 'YouTube',
 };
 
 const nav = [
@@ -92,6 +102,11 @@ function renderPanel(
   homelab: HomelabProps,
   wikipedia: WikipediaData,
   conversation: ConversationProps,
+  instagram: WikipediaData,
+  internet: WikipediaData,
+  xData: WikipediaData,
+  facebookData: WikipediaData,
+  youtubeData: WikipediaData,
 ) {
   switch (id) {
     case 'dashboard': return <SystemPanel {...system} />;
@@ -100,6 +115,11 @@ function renderPanel(
     case 'goals': return <SelfModelPanel />;
     case 'memory': return <MemoryPanel />;
     case 'wikipedia': return <WikipediaPanel data={wikipedia} />;
+    case 'instagram': return <WikipediaPanel data={instagram} />;
+    case 'internet': return <WikipediaPanel data={internet} />;
+    case 'x': return <WikipediaPanel data={xData} />;
+    case 'facebook': return <WikipediaPanel data={facebookData} />;
+    case 'youtube': return <WikipediaPanel data={youtubeData} />;
     default: return <ConversationPanel setOrbState={setOrbState} {...conversation} />;
   }
 }
@@ -126,9 +146,15 @@ export function NeronConsole() {
   const [resources, setResources] = useState<SystemResources | null>(null);
   const [homelab, setHomelab] = useState<HomelabData | null>(null);
   const [wikipedia, setWikipedia] = useState<WikipediaData>(null);
+  const [instagram, setInstagram] = useState<WikipediaData>(null);
+  const [internet, setInternet] = useState<WikipediaData>(null);
+  const [xData, setXData] = useState<WikipediaData>(null);
+  const [facebookData, setFacebookData] = useState<WikipediaData>(null);
+  const [youtubeData, setYoutubeData] = useState<WikipediaData>(null);
   const prevStatuses = useRef<Record<string, string>>({});
   const wasResourceAlert = useRef(false);
   const openWindowRef = useRef<(id: WindowId) => void>(() => {});
+  const closeWindowRef = useRef<(id: WindowId) => void>(() => {});
 
   const lastEvent = useNeronEvents();
   const { messages, status, isStreaming, isThinking, send, clear } = useNeron();
@@ -148,20 +174,41 @@ export function NeronConsole() {
 
   useEffect(() => {
     openWindowRef.current = openWindow;
+    closeWindowRef.current = closeWindow;
   });
 
   useEffect(() => {
     if (!lastEvent) return;
     if (lastEvent.event === 'memory.wikipedia_fallback') {
       const data = lastEvent.data as Record<string, unknown>;
-      setWikipedia({
+      const payload = {
         query: (data.query as string) ?? '',
         title: (data.title as string) ?? null,
         url: (data.url as string) ?? null,
         summary: (data.summary as string) ?? null,
         image_url: (data.image_url as string) ?? null,
-      });
-      openWindowRef.current('wikipedia');
+      };
+      if (data.source === 'instagram') {
+        setInstagram(payload);
+        openWindowRef.current('instagram');
+      } else if (data.source === 'web') {
+        setInternet(payload);
+        closeWindowRef.current('wikipedia');
+        openWindowRef.current('internet');
+      } else if (data.source === 'x') {
+        setXData(payload);
+        openWindowRef.current('x');
+      } else if (data.source === 'facebook') {
+        setFacebookData(payload);
+        openWindowRef.current('facebook');
+      } else if (data.source === 'youtube') {
+        setYoutubeData(payload);
+        openWindowRef.current('youtube');
+      } else {
+        setWikipedia(payload);
+        closeWindowRef.current('internet');
+        openWindowRef.current('wikipedia');
+      }
     }
   }, [lastEvent]);
 
@@ -240,6 +287,12 @@ export function NeronConsole() {
     if (text.includes('vocal') || text.includes('micro')) return openWindow('vocal');
     if (text.includes('goal') || text.includes('objectif')) return openWindow('goals');
     if (text.includes('mémoire') || text.includes('memory')) return openWindow('memory');
+    closeWindow('wikipedia');
+    closeWindow('internet');
+    closeWindow('instagram');
+    closeWindow('x');
+    closeWindow('facebook');
+    closeWindow('youtube');
     openWindow('conversation');
     send(command);
   }
@@ -284,7 +337,7 @@ export function NeronConsole() {
           onFocus={() => bringToFront(win.id)}
           onMove={(x, y) => moveWindow(win.id, x, y)}
         >
-          {renderPanel(win.id, orbState, setOrbState, { health, healthError, services }, { services, resources, homelab, onSlotSaved: () => getHomelabData().then(setHomelab) }, wikipedia, { messages, status, isStreaming, isThinking, clear })}
+          {renderPanel(win.id, orbState, setOrbState, { health, healthError, services }, { services, resources, homelab, onSlotSaved: () => getHomelabData().then(setHomelab) }, wikipedia, { messages, status, isStreaming, isThinking, clear }, instagram, internet, xData, facebookData, youtubeData)}
         </FloatingWindow>
       ))}
 
