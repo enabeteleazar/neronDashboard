@@ -1,6 +1,5 @@
-import { FormEvent, useEffect, useRef, useState } from 'react';
-import { Send } from 'lucide-react';
-import { useNeron } from '../../hooks/useNeron';
+import { useEffect, useRef } from 'react';
+import type { ChatMessage, ConnectionStatus } from '../../lib/neronApi';
 import type { OrbState } from '../../components/NeronOrb';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -10,9 +9,23 @@ const STATUS_LABEL: Record<string, string> = {
   error: 'Erreur de connexion',
 };
 
-export function ConversationPanel({ setOrbState }: { orbState: OrbState; setOrbState: (s: OrbState) => void }) {
-  const { messages, status, isStreaming, isThinking, send, clear } = useNeron();
-  const [value, setValue] = useState('');
+type ConversationProps = {
+  setOrbState: (s: OrbState) => void;
+  messages: ChatMessage[];
+  status: ConnectionStatus;
+  isStreaming: boolean;
+  isThinking: boolean;
+  clear: () => void;
+};
+
+export function ConversationPanel({
+  setOrbState,
+  messages,
+  status,
+  isStreaming,
+  isThinking,
+  clear,
+}: ConversationProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,14 +37,6 @@ export function ConversationPanel({ setOrbState }: { orbState: OrbState; setOrbS
     else if (isStreaming) setOrbState('working');
     else setOrbState('idle');
   }, [isThinking, isStreaming, setOrbState]);
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    const text = value.trim();
-    if (!text) return;
-    send(text);
-    setValue('');
-  }
 
   return (
     <div className="conversation-shell">
@@ -53,17 +58,6 @@ export function ConversationPanel({ setOrbState }: { orbState: OrbState; setOrbS
         <div ref={bottomRef} />
       </div>
 
-      <form className="conversation-input" onSubmit={submit}>
-        <input
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          placeholder="Écrire à Néron…"
-          disabled={status !== 'connected'}
-        />
-        <button type="submit" aria-label="Envoyer" disabled={status !== 'connected'}>
-          <Send size={16} />
-        </button>
-      </form>
       {messages.length > 0 && (
         <button className="conversation-clear" onClick={clear} type="button">Effacer la conversation</button>
       )}
