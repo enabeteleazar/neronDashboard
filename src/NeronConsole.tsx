@@ -1,5 +1,5 @@
 import { Activity, Bot, Cpu, Database, Home, Mic, Server, Settings, Target } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CommandBar } from './components/CommandBar';
 import { FloatingWindow } from './components/FloatingWindow';
 import { NeronOrb, type OrbState } from './components/NeronOrb';
@@ -9,8 +9,21 @@ import { MemoryPanel } from './features/memory';
 import { SelfModelPanel } from './features/selfmodel';
 import { SystemPanel } from './features/system';
 import { VocalPanel } from './features/vocal';
+import { WikipediaPanel, type WikipediaData } from './features/wikipedia/WikipediaPanel';
+import { useNeronEvents } from './hooks/useNeronEvents';
+import { useNeron } from './hooks/useNeron';
+import {
+  getHealth,
+  getHomelabData,
+  getServices,
+  getSystemResources,
+  type HomelabData,
+  type NeronHealth,
+  type ServiceRegistration,
+  type SystemResources,
+} from './lib/neronApi';
 
-type WindowId = 'conversation' | 'dashboard' | 'homelab' | 'vocal' | 'goals' | 'memory';
+type WindowId = 'conversation' | 'dashboard' | 'homelab' | 'vocal' | 'goals' | 'memory' | 'wikipedia';
 
 type WindowRuntimeState = {
   x: number;
@@ -28,6 +41,7 @@ const initialLayout: Record<WindowId, Omit<WindowRuntimeState, 'z' | 'minimized'
   vocal: { x: 1010, y: 610, width: 390 },
   goals: { x: 760, y: 560, width: 370 },
   memory: { x: 760, y: 120, width: 370 },
+  wikipedia: { x: 480, y: 160, width: 520 },
 };
 
 const titles: Record<WindowId, string> = {
@@ -37,6 +51,7 @@ const titles: Record<WindowId, string> = {
   vocal: 'Vocal',
   goals: 'Goals',
   memory: 'Mémoire',
+  wikipedia: 'Wikipédia',
 };
 
 const nav = [
@@ -48,14 +63,44 @@ const nav = [
   { id: 'memory' as const, label: 'Mémoire', icon: Database },
 ];
 
-function renderPanel(id: WindowId) {
+type SystemProps = {
+  health: NeronHealth | null;
+  healthError: boolean;
+  services: ServiceRegistration[] | null;
+};
+
+type ConversationProps = {
+  messages: import('./lib/neronApi').ChatMessage[];
+  status: import('./lib/neronApi').ConnectionStatus;
+  isStreaming: boolean;
+  isThinking: boolean;
+  clear: () => void;
+};
+
+type HomelabProps = {
+  services: ServiceRegistration[] | null;
+  resources: SystemResources | null;
+  homelab: HomelabData | null;
+  onSlotSaved: () => void;
+};
+
+function renderPanel(
+  id: WindowId,
+  orbState: OrbState,
+  setOrbState: (s: OrbState) => void,
+  system: SystemProps,
+  homelab: HomelabProps,
+  wikipedia: WikipediaData,
+  conversation: ConversationProps,
+) {
   switch (id) {
-    case 'dashboard': return <SystemPanel />;
-    case 'homelab': return <HomelabPanel />;
+    case 'dashboard': return <SystemPanel {...system} />;
+    case 'homelab': return <HomelabPanel {...homelab} />;
     case 'vocal': return <VocalPanel />;
     case 'goals': return <SelfModelPanel />;
     case 'memory': return <MemoryPanel />;
-    default: return <ConversationPanel />;
+    case 'wikipedia': return <WikipediaPanel data={wikipedia} />;
+    default: return <ConversationPanel setOrbState={setOrbState} {...conversation} />;
   }
 }
 
@@ -70,10 +115,23 @@ function buildInitialWindows(): Record<WindowId, WindowRuntimeState> {
 }
 
 export function NeronConsole() {
-  const [openWindows, setOpenWindows] = useState<WindowId[]>(['conversation', 'dashboard', 'homelab', 'vocal']);
+  const [openWindows, setOpenWindows] = useState<WindowId[]>([]);
   const [windows, setWindows] = useState<Record<WindowId, WindowRuntimeState>>(buildInitialWindows);
   const [topZ, setTopZ] = useState(20);
   const [orbState, setOrbState] = useState<OrbState>('idle');
+
+  const [health, setHealth] = useState<NeronHealth | null>(null);
+  const [healthError, setHealthError] = useState(false);
+  const [services, setServices] = useState<ServiceRegistration[] | null>(null);
+  const [resources, setResources] = useState<SystemResources | null>(null);
+  const [homelab, setHomelab] = useState<HomelabData | null>(null);
+  const [wikipedia, setWikipedia] = useState<WikipediaData>(null);
+  const prevStatuses = useRef<Record<string, string>>({});
+  const wasResourceAlert = useRef(false);
+  const openWindowRef = useRef<(id: WindowId) => void>(() => {});
+
+  const lastEvent = useNeronEvents();
+  const { messages, status, isStreaming, isThinking, send, clear } = useNeron();
 
   const visibleWindows = useMemo(
     () => openWindows.map((id) => ({ id, ...windows[id] })),
@@ -87,6 +145,69 @@ export function NeronConsole() {
     setOrbState('working');
     window.setTimeout(() => setOrbState('idle'), 1400);
   }
+
+  useEffect(() => {
+    openWindowRef.current = openWindow;
+  });
+
+  useEffect(() => {
+    if (!lastEvent) return;
+    if (lastEvent.event === 'memory.wikipedia_fallback') {
+      const data = lastEvent.data as Record<string, unknown>;
+      setWikipedia({
+        query: (data.query as string) ?? '',
+        title: (data.title as string) ?? null,
+        url: (data.url as string) ?? null,
+        summary: (data.summary as string) ?? null,
+        image_url: (data.image_url as string) ?? null,
+      });
+      openWindowRef.current('wikipedia');
+    }
+  }, [lastEvent]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    function poll() {
+      getHealth()
+        .then((data) => { if (!cancelled) { setHealth(data); setHealthError(false); } })
+        .catch(() => { if (!cancelled) setHealthError(true); });
+
+      getSystemResources().then((data) => {
+        if (cancelled) return;
+        setResources(data);
+        const isAlert = [data.cpu_pct, data.ram_pct, data.disk_pct].some((v) => v != null && v >= 90);
+        if (isAlert && !wasResourceAlert.current) openWindowRef.current('homelab');
+        wasResourceAlert.current = isAlert;
+      });
+
+      getHomelabData().then((data) => {
+        if (cancelled) return;
+        setHomelab(data);
+      });
+
+      getServices()
+        .then((data) => {
+          if (cancelled) return;
+          const list = data.services ?? [];
+          const nextStatuses: Record<string, string> = {};
+          let changed = false;
+          for (const service of list) {
+            nextStatuses[service.service_name] = service.status;
+            const prev = prevStatuses.current[service.service_name];
+            if (prev !== undefined && prev !== service.status) changed = true;
+          }
+          prevStatuses.current = nextStatuses;
+          setServices(list);
+          if (changed) openWindowRef.current('dashboard');
+        })
+        .catch(() => { if (!cancelled) setServices(null); });
+    }
+
+    poll();
+    const id = window.setInterval(poll, 2000);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, []);
 
   function closeWindow(id: WindowId) {
     setOpenWindows((current) => current.filter((windowId) => windowId !== id));
@@ -120,14 +241,12 @@ export function NeronConsole() {
     if (text.includes('goal') || text.includes('objectif')) return openWindow('goals');
     if (text.includes('mémoire') || text.includes('memory')) return openWindow('memory');
     openWindow('conversation');
-    setOrbState('thinking');
-    window.setTimeout(() => setOrbState('idle'), 1600);
+    send(command);
   }
 
   return (
     <main className="console-shell">
       <aside className="sidebar">
-        <div className="brand"><div className="brand-orb" /><div><strong>NéronWeb</strong><small>Console</small></div></div>
         <button className="nav-home"><Home size={18} /> Accueil</button>
         <nav>
           {nav.map((item) => {
@@ -137,13 +256,12 @@ export function NeronConsole() {
         </nav>
         <div className="sidebar-status">
           <Activity size={18} />
-          <div><strong>Néron</strong><small>En ligne</small></div>
+          <div><small>Aucune Notif .</small></div>
         </div>
       </aside>
 
       <header className="topbar">
         <div className="wordmark">NÉRON</div>
-        <div className="top-actions"><span>Online</span><Settings size={18} /></div>
       </header>
 
       <section className="orb-zone">
@@ -166,12 +284,11 @@ export function NeronConsole() {
           onFocus={() => bringToFront(win.id)}
           onMove={(x, y) => moveWindow(win.id, x, y)}
         >
-          {renderPanel(win.id)}
+          {renderPanel(win.id, orbState, setOrbState, { health, healthError, services }, { services, resources, homelab, onSlotSaved: () => getHomelabData().then(setHomelab) }, wikipedia, { messages, status, isStreaming, isThinking, clear })}
         </FloatingWindow>
       ))}
 
       <CommandBar onCommand={handleCommand} />
-      <footer className="connection-state">Connecté à Néron Core</footer>
     </main>
   );
 }

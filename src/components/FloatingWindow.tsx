@@ -37,6 +37,7 @@ export function FloatingWindow({
   function startDrag(event: ReactPointerEvent<HTMLElement>) {
     // Ignore drags initiated on interactive controls in the header.
     if ((event.target as HTMLElement).closest('button')) return;
+    event.preventDefault();
     onFocus();
     dragState.current = { startX: event.clientX, startY: event.clientY, originX: x, originY: y };
     (event.target as HTMLElement).setPointerCapture(event.pointerId);
@@ -44,6 +45,7 @@ export function FloatingWindow({
 
   function onDrag(event: ReactPointerEvent<HTMLElement>) {
     if (!dragState.current) return;
+    event.preventDefault();   
     const { startX, startY, originX, originY } = dragState.current;
     const nextX = Math.max(8, originX + (event.clientX - startX));
     const nextY = Math.max(8, originY + (event.clientY - startY));
@@ -51,6 +53,7 @@ export function FloatingWindow({
   }
 
   function endDrag(event: ReactPointerEvent<HTMLElement>) {
+    event.preventDefault();
     dragState.current = null;
     (event.target as HTMLElement).releasePointerCapture(event.pointerId);
   }

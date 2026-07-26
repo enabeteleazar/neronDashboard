@@ -1,5 +1,12 @@
 import { DashboardPanel } from '../dashboard';
+import type { NeronHealth, ServiceRegistration } from '../../lib/neronApi';
 
-export function SystemPanel() {
-  return <DashboardPanel />;
+type SystemPanelProps = {
+  health: NeronHealth | null;
+  healthError: boolean;
+  services: ServiceRegistration[] | null;
+};
+
+export function SystemPanel(props: SystemPanelProps) {
+  return <DashboardPanel {...props} />;
 }

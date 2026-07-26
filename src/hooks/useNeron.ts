@@ -13,6 +13,7 @@ export type UseNeronReturn = {
   messages: ChatMessage[];
   status: ConnectionStatus;
   isStreaming: boolean;
+  isThinking: boolean;
   send: (text: string) => void;
   clear: () => void;
 };
@@ -21,6 +22,7 @@ export function useNeron(): UseNeronReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const rpcIdRef = useRef(0);
@@ -82,6 +84,7 @@ export function useNeron(): UseNeronReturn {
 
       if (eventName === 'agent.token') {
         const token = (data.token as string) ?? '';
+        setIsThinking(false);
         setIsStreaming(true);
         setMessages((prev) => {
           const last = prev[prev.length - 1];
@@ -97,6 +100,7 @@ export function useNeron(): UseNeronReturn {
       }
 
       if (eventName === 'agent.done') {
+        setIsThinking(false);
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last?.role === 'assistant' && last.streaming) {
@@ -110,6 +114,7 @@ export function useNeron(): UseNeronReturn {
 
       if (eventName === 'agent.error') {
         const msg = (data.message as string) ?? 'Erreur inconnue';
+        setIsThinking(false);
         setMessages((prev) => [
           ...prev,
           { id: makeId(), role: 'assistant', content: msg, streaming: false, timestamp: new Date(), error: true },
@@ -121,6 +126,7 @@ export function useNeron(): UseNeronReturn {
     ws.onclose = () => {
       setStatus('disconnected');
       setIsStreaming(false);
+      setIsThinking(false);
       if (!unmountedRef.current) {
         setTimeout(connect, RECONNECT_DELAY_MS);
       }
@@ -144,7 +150,7 @@ export function useNeron(): UseNeronReturn {
   const send = useCallback(
     (text: string) => {
       const trimmed = text.trim();
-      if (!trimmed || isStreaming) return;
+      if (!trimmed || isStreaming || isThinking) return;
 
       const ws = wsRef.current;
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -153,6 +159,7 @@ export function useNeron(): UseNeronReturn {
         ...prev,
         { id: makeId(), role: 'user', content: trimmed, streaming: false, timestamp: new Date() },
       ]);
+      setIsThinking(true);
 
       ws.send(
         JSON.stringify({
@@ -162,10 +169,10 @@ export function useNeron(): UseNeronReturn {
         }),
       );
     },
-    [isStreaming],
+    [isStreaming, isThinking],
   );
 
   const clear = useCallback(() => setMessages([]), []);
 
-  return { messages, status, isStreaming, send, clear };
+  return { messages, status, isStreaming, isThinking, send, clear };
 }

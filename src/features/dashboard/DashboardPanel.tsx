@@ -1,36 +1,33 @@
-import { useEffect, useState } from 'react';
-import { type AgentInfo, getHealth, getStatus, type NeronHealth } from '../../lib/neronApi';
+import type { NeronHealth, ServiceRegistration } from '../../lib/neronApi';
 
-const metrics = [
-  ['CPU', '16%', 'normal'],
-  ['RAM', '32%', 'stable'],
-  ['Disque', '28%', 'OK'],
-  ['Réseau', '23%', 'actif'],
-] as const;
+const serviceLabels: Record<string, string> = {
+  web: 'Interface Web',
+  homeassistant: 'Home Assistant',
+  llm: 'Provider LLM',
+  goal: 'Moteur de Goals',
+  memory: 'Mémoire',
+};
 
-export function DashboardPanel() {
-  const [health, setHealth] = useState<NeronHealth | null>(null);
-  const [healthError, setHealthError] = useState(false);
-  const [agents, setAgents] = useState<Record<string, AgentInfo> | null>(null);
+function serviceLabel(name: string): string {
+  return serviceLabels[name] ?? name;
+}
 
-  useEffect(() => {
-    let cancelled = false;
+function statusLabel(status: string): string {
+  switch (status) {
+    case 'healthy': return 'En ligne';
+    case 'degraded': return 'Dégradé';
+    case 'unhealthy': return 'En panne';
+    default: return 'Inconnu';
+  }
+}
 
-    function poll() {
-      getHealth()
-        .then((data) => { if (!cancelled) { setHealth(data); setHealthError(false); } })
-        .catch(() => { if (!cancelled) setHealthError(true); });
+type DashboardPanelProps = {
+  health: NeronHealth | null;
+  healthError: boolean;
+  services: ServiceRegistration[] | null;
+};
 
-      getStatus()
-        .then((data) => { if (!cancelled) setAgents(data.agents ?? {}); })
-        .catch(() => { if (!cancelled) setAgents(null); });
-    }
-
-    poll();
-    const id = window.setInterval(poll, 8000);
-    return () => { cancelled = true; window.clearInterval(id); };
-  }, []);
-
+export function DashboardPanel({ health, healthError, services }: DashboardPanelProps) {
   return (
     <div className="panel-grid">
       <div className="core-health">
@@ -41,20 +38,17 @@ export function DashboardPanel() {
         </div>
       </div>
 
-      {metrics.map(([label, value, status]) => (
-        <div className="metric-card" key={label}>
-          <span>{label}</span><strong>{value}</strong><small>{status}</small>
-        </div>
-      ))}
-
       <div className="service-list">
         <h3>Services</h3>
-        {agents && Object.keys(agents).length > 0
-          ? Object.entries(agents).map(([name, info]) => (
-              <p key={name}><span>{name}</span><b>{info.status}</b></p>
-            ))
-          : ['neron-core', 'ollama', 'docker', 'home-assistant', 'watchdog'].map((service) => (
-              <p key={service}><span>{service}</span><b>{healthError ? 'Inconnu' : 'En ligne'}</b></p>
+        {services === null
+          ? <p><span>Services</span><b>Injoignable</b></p>
+          : services.length === 0
+          ? <p><span>Aucun service enregistré</span></p>
+          : services.map((service) => (
+              <p key={service.service_name}>
+                <span>{serviceLabel(service.service_name)}</span>
+                <b className={`status-${service.status}`}>{statusLabel(service.status)}</b>
+              </p>
             ))}
       </div>
     </div>

@@ -12,7 +12,7 @@ export async function neronFetch<T>(path: string, options: ApiOptions = {}, base
     headers.set('Content-Type', 'application/json');
   }
   if (auth !== false && API_KEY) {
-    headers.set('X-API-Key', API_KEY);
+    headers.set('Authorization', `Bearer ${API_KEY}`);
   }
 
   const controller = new AbortController();
@@ -50,8 +50,15 @@ export type AgentInfo = {
   [key: string]: unknown;
 };
 
+export type NeronResources = {
+  cpu_pct?: number;
+  ram_pct?: number;
+  disk_pct?: number;
+};
+
 export type NeronStatus = {
   agents?: Record<string, AgentInfo>;
+  resources?: NeronResources;
   [key: string]: unknown;
 };
 
@@ -90,6 +97,92 @@ export async function getHealth() {
 
 export async function getStatus() {
   return neronFetch<NeronStatus>('/status', { timeoutMs: 5000 });
+}
+
+export type ServiceRegistration = {
+  service_name: string;
+  host: string;
+  port: number;
+  version?: string;
+  status: 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
+  capabilities?: string[];
+  metadata?: Record<string, unknown>;
+};
+
+export type SystemResources = {
+  cpu_pct: number | null;
+  ram_pct: number | null;
+  disk_pct: number | null;
+};
+
+function extractGauge(text: string, name: string): number | null {
+  const match = text.match(new RegExp(`^${name} ([0-9.]+)`, 'm'));
+  return match ? Number(match[1]) : null;
+}
+
+export async function getSystemResources(): Promise<SystemResources> {
+  const empty: SystemResources = { cpu_pct: null, ram_pct: null, disk_pct: null };
+  try {
+    const headers = new Headers();
+    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
+    const response = await fetch(`${API_URL}/self-model`, { headers });
+    if (!response.ok) return empty;
+    const data = await response.json();
+    const runtime = data?.runtime ?? {};
+    return {
+      cpu_pct: runtime.cpu_usage ?? null,
+      ram_pct: runtime.ram_usage ?? null,
+      disk_pct: runtime.disk_usage ?? null,
+    };
+  } catch {
+    return empty;
+  }
+}
+
+export async function getServices() {
+  return neronFetch<{ services: ServiceRegistration[]; count: number }>('/registry/services', { timeoutMs: 5000 });
+}
+
+export type HomelabCatalogItem = {
+  id: string;
+  name: string;
+  category: string;
+  specs: string;
+  description: string;
+};
+
+export type HomelabData = {
+  catalog: HomelabCatalogItem[];
+  slots: Record<string, string>;
+};
+
+export async function getHomelabData(): Promise<HomelabData> {
+  const empty: HomelabData = { catalog: [], slots: {} };
+  try {
+    const headers = new Headers();
+    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
+    const response = await fetch(`${API_URL}/self-model`, { headers });
+    if (!response.ok) return empty;
+    const data = await response.json();
+    return data?.homelab ?? empty;
+  } catch {
+    return empty;
+  }
+}
+
+export async function setHomelabSlot(unitId: string, catalogId: string | null): Promise<boolean> {
+  try {
+    const headers = new Headers({ 'Content-Type': 'application/json' });
+    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
+    const response = await fetch(`${API_URL}/self-model/homelab/slots/${unitId}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ catalog_id: catalogId }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 export async function sendGoal(goal: string) {
