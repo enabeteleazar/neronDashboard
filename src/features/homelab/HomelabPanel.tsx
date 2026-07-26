@@ -1,9 +1,14 @@
-import type { ServiceRegistration, SystemResources } from '../../lib/neronApi';
-import { DEFAULT_RACK, UNIT_IDS } from './rackConfig';
+import { useState } from 'react';
+import type { HomelabData, ServiceRegistration, SystemResources } from '../../lib/neronApi';
+import { setHomelabSlot } from '../../lib/neronApi';
+import { DEFAULT_RACK, UNIT_IDS, type UnitId } from './rackConfig';
+import { HomelabItemModal } from './HomelabItemModal';
 
 type HomelabPanelProps = {
   services: ServiceRegistration[] | null;
   resources: SystemResources | null;
+  homelab: HomelabData | null;
+  onSlotSaved: () => void;
 };
 
 function gaugeColor(value: number | null | undefined): string {
@@ -47,29 +52,51 @@ function Gauge({ label, value }: { label: string; value: number | null | undefin
   );
 }
 
-export function HomelabPanel({ resources }: HomelabPanelProps) {
+export function HomelabPanel({ resources, homelab, onSlotSaved }: HomelabPanelProps) {
+  const [configuringUnit, setConfiguringUnit] = useState<UnitId | null>(null);
+
+  const catalog = homelab?.catalog ?? [];
+  const slots = homelab?.slots ?? {};
+
+  function handleSave(unitId: UnitId, catalogId: string | null) {
+    setHomelabSlot(unitId, catalogId).then((ok) => {
+      if (ok) onSlotSaved();
+    });
+  }
+
   return (
     <div className="rack-panel">
       {UNIT_IDS.map((unitId) => {
         const slot = DEFAULT_RACK[unitId];
+        const assignedId = slots[unitId];
+        const assignedItem = assignedId ? catalog.find((item) => item.id === assignedId) : null;
 
         if (!slot.isReal) {
           return (
-            <article key={unitId} className="rack-slot status-offline rack-slot-empty">
+            <article
+              key={unitId}
+              className={`rack-slot rack-slot-clickable status-offline${assignedItem ? '' : ' rack-slot-empty'}`}
+              onClick={() => setConfiguringUnit(unitId)}
+            >
               <div className="rack-slot-header">
                 <span className="rack-unit">{unitId}</span>
-                <strong>Emplacement libre</strong>
-                <span className="rack-status-dot dot-offline" title="non configuré" />
+                <strong>{assignedItem ? assignedItem.name : 'Emplacement libre'}</strong>
+                <span className={`rack-status-dot ${assignedItem ? 'dot-online' : 'dot-offline'}`} title={assignedItem ? 'configuré' : 'non configuré'} />
               </div>
             </article>
-          );
+         );
         }
 
         return (
-          <article key={unitId} className={`rack-slot status-${slot.status}`} style={{ borderLeftColor: slot.accentHex }}>
+          <article
+            key={unitId}
+            className={`rack-slot rack-slot-clickable status-${slot.status}`}
+            style={{ borderLeftColor: slot.accentHex }}
+            onClick={() => setConfiguringUnit(unitId)}
+          >
             <div className="rack-slot-header">
               <span className="rack-unit">{unitId}</span>
-              <strong>{slot.label}</strong>
+              <strong>{assignedItem ? assignedItem.name : slot.label}</strong>
               <div className="rack-gauges-row">
                 <Gauge label="CPU" value={resources?.cpu_pct} />
                 <Gauge label="RAM" value={resources?.ram_pct} />
@@ -80,6 +107,16 @@ export function HomelabPanel({ resources }: HomelabPanelProps) {
           </article>
         );
       })}
+
+      {configuringUnit && (
+        <HomelabItemModal
+          unitId={configuringUnit}
+          catalog={catalog}
+          currentCatalogId={slots[configuringUnit] ?? null}
+          onSave={(catalogId) => handleSave(configuringUnit, catalogId)}
+          onClose={() => setConfiguringUnit(null)}
+        />
+      )}
     </div>
   );
 }

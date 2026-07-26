@@ -143,6 +143,48 @@ export async function getServices() {
   return neronFetch<{ services: ServiceRegistration[]; count: number }>('/registry/services', { timeoutMs: 5000 });
 }
 
+export type HomelabCatalogItem = {
+  id: string;
+  name: string;
+  category: string;
+  specs: string;
+  description: string;
+};
+
+export type HomelabData = {
+  catalog: HomelabCatalogItem[];
+  slots: Record<string, string>;
+};
+
+export async function getHomelabData(): Promise<HomelabData> {
+  const empty: HomelabData = { catalog: [], slots: {} };
+  try {
+    const headers = new Headers();
+    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
+    const response = await fetch(`${API_URL}/self-model`, { headers });
+    if (!response.ok) return empty;
+    const data = await response.json();
+    return data?.homelab ?? empty;
+  } catch {
+    return empty;
+  }
+}
+
+export async function setHomelabSlot(unitId: string, catalogId: string | null): Promise<boolean> {
+  try {
+    const headers = new Headers({ 'Content-Type': 'application/json' });
+    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
+    const response = await fetch(`${API_URL}/self-model/homelab/slots/${unitId}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ catalog_id: catalogId }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function sendGoal(goal: string) {
   return neronFetch<{ response?: string; goal_id?: string }>('/goal', {
     method: 'POST',

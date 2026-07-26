@@ -199,3 +199,75 @@ nav button:hover { background: rgba(255,255,255,.07); color: white; }
 .gauge-svg { width: 100%; }
 .gauge-value { font-size: 8px; font-weight: 700; color: #f4f6ff; margin-top: -5px; }
 .gauge-label { font-size: 6px; color: #9ca3af; text-transform: uppercase; letter-spacing: .03em; }
+
+
+.rack-slot-clickable { cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+.rack-slot-clickable:hover { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.16); }
+
+.homelab-modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(2,4,13,.75);
+  animation: homelab-fade-in .15s ease;
+}
+.homelab-modal {
+  width: 100%; max-width: 480px; max-height: 85vh; overflow-y: auto;
+  background: #0b0d18; border: 1px solid rgba(255,255,255,.09); border-radius: 12px;
+  animation: homelab-pop-in .15s ease;
+}
+.homelab-modal-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 18px 20px; border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.homelab-modal-header h2 { margin: 0; font-size: 15px; letter-spacing: .04em; color: #eef3ff; }
+.homelab-modal-header p { margin: 4px 0 0; font-size: 10px; letter-spacing: .08em; color: rgba(238,243,255,.35); }
+.homelab-modal-close { background: transparent; border: 0; color: rgba(238,243,255,.4); cursor: pointer; padding: 4px; border-radius: 6px; display: grid; place-items: center; }
+.homelab-modal-close:hover { color: #eef3ff; background: rgba(255,255,255,.07); }
+
+.homelab-modal-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+.homelab-modal-label { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: rgba(238,243,255,.4); }
+
+.homelab-catalog-grid { display: flex; flex-direction: column; gap: 8px; }
+.homelab-catalog-empty { font-size: 12px; color: rgba(238,243,255,.4); margin: 0; }
+.homelab-catalog-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 8px;
+  background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08);
+  color: #dce2ff; cursor: pointer; text-align: left; font-size: 13px;
+  transition: background .15s ease, border-color .15s ease;
+}
+.homelab-catalog-item:hover { background: rgba(255,255,255,.06); }
+.homelab-catalog-item.active { background: rgba(127,92,255,.14); border-color: rgba(127,92,255,.4); }
+.homelab-catalog-item span { flex: 1; }
+.homelab-catalog-check { color: #69f5a1; }
+
+.homelab-item-preview {
+  padding: 12px 14px; border-radius: 8px;
+  background: rgba(105,245,161,.06); border: 1px solid rgba(105,245,161,.18);
+}
+.homelab-item-preview strong { display: block; font-size: 13px; color: #eef3ff; margin-bottom: 6px; }
+.homelab-item-specs { margin: 0 0 6px; font-size: 12px; color: rgba(238,243,255,.55); }
+.homelab-item-description { margin: 0; font-size: 12px; color: rgba(238,243,255,.75); line-height: 1.4; }
+
+.homelab-modal-footer {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 14px 20px; border-top: 1px solid rgba(255,255,255,.08);
+}
+.homelab-modal-cancel {
+  padding: 9px 16px; border-radius: 8px; font-size: 12px;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); color: rgba(238,243,255,.6);
+  cursor: pointer;
+}
+.homelab-modal-cancel:hover { color: #eef3ff; }
+.homelab-modal-save {
+  padding: 9px 16px; border-radius: 8px; font-size: 12px; border: 0; cursor: pointer;
+  background: linear-gradient(135deg, #7f5cff, #bd6cff); color: white;
+}
+
+@keyframes homelab-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes homelab-pop-in { from { opacity: 0; transform: scale(.96) translateY(6px); } to { opacity: 1; transform: none; } }
+.homelab-item-remove {
+  margin-top: 10px; background: transparent; border: 0; padding: 0;
+  font-size: 11px; color: rgba(248,113,113,.75); cursor: pointer; text-decoration: underline;
+}
+.homelab-item-remove:hover { color: #f87171; }
