@@ -148,6 +148,7 @@ export function NeronConsole() {
         title: (data.title as string) ?? null,
         url: (data.url as string) ?? null,
         summary: (data.summary as string) ?? null,
+        image_url: (data.image_url as string) ?? null,
       });
       openWindowRef.current('wikipedia');
     }

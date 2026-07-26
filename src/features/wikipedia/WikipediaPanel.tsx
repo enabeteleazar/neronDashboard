@@ -3,6 +3,7 @@ type WikipediaData = {
   title: string | null;
   url: string | null;
   summary: string | null;
+  image_url: string | null;
 } | null;
 
 type WikipediaProps = {
@@ -16,8 +17,15 @@ export function WikipediaPanel({ data }: WikipediaProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '6px 10px', fontSize: 13, opacity: 0.8 }}>
-        {data.title ?? data.query}
+      <div style={{ padding: '6px 10px', fontSize: 13, opacity: 0.8, display: 'flex', gap: 10, alignItems: 'center' }}>
+        {data.image_url && (
+          <img
+            src={data.image_url}
+            alt={data.title ?? data.query}
+            style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6 }}
+          />
+        )}
+        <span>{data.title ?? data.query}</span>
       </div>
       <iframe
         src={data.url}
