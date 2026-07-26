@@ -34,6 +34,13 @@ type WindowRuntimeState = {
   z: number;
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  connecting: 'Connexion…',
+  connected: 'Connecté',
+  disconnected: 'Déconnecté — reconnexion…',
+  error: 'Erreur de connexion',
+};
+
 const initialLayout: Record<WindowId, Omit<WindowRuntimeState, 'z' | 'minimized' | 'pinned'>> = {
   conversation: { x: 270, y: 110, width: 430 },
   dashboard: { x: 980, y: 110, width: 470 },
@@ -155,6 +162,7 @@ export function NeronConsole() {
   const wasResourceAlert = useRef(false);
   const openWindowRef = useRef<(id: WindowId) => void>(() => {});
   const closeWindowRef = useRef<(id: WindowId) => void>(() => {});
+  const inactivityTimerRef = useRef<number | null>(null);
 
   const lastEvent = useNeronEvents();
   const { messages, status, isStreaming, isThinking, send, clear } = useNeron();
@@ -256,11 +264,19 @@ export function NeronConsole() {
     return () => { cancelled = true; window.clearInterval(id); };
   }, []);
 
+  function resetInactivityTimer() {
+    if (inactivityTimerRef.current) window.clearTimeout(inactivityTimerRef.current);
+    inactivityTimerRef.current = window.setTimeout(() => {
+      setOpenWindows((current) => current.filter((id) => windows[id]?.pinned));
+    }, 60000);
+  }
+
   function closeWindow(id: WindowId) {
     setOpenWindows((current) => current.filter((windowId) => windowId !== id));
   }
 
   function bringToFront(id: WindowId) {
+    resetInactivityTimer();
     setTopZ((z) => {
       const nextZ = z + 1;
       setWindows((current) => ({ ...current, [id]: { ...current[id], z: nextZ } }));
@@ -269,6 +285,7 @@ export function NeronConsole() {
   }
 
   function moveWindow(id: WindowId, x: number, y: number) {
+    resetInactivityTimer();
     setWindows((current) => ({ ...current, [id]: { ...current[id], x, y } }));
   }
 
@@ -281,6 +298,7 @@ export function NeronConsole() {
   }
 
   function handleCommand(command: string) {
+    resetInactivityTimer();
     const text = command.toLowerCase();
     if (text.includes('système') || text.includes('status') || text.includes('dashboard')) return openWindow('dashboard');
     if (text.includes('homelab') || text.includes('serveur')) return openWindow('homelab');
@@ -309,7 +327,7 @@ export function NeronConsole() {
         </nav>
         <div className="sidebar-status">
           <Activity size={18} />
-          <div><small>Aucune Notif .</small></div>
+          <div><small>{STATUS_LABEL[status] ?? status}</small></div>
         </div>
       </aside>
 
