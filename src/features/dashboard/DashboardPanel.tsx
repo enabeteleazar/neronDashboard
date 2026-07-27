@@ -47,6 +47,7 @@ export function DashboardPanel({ health, healthError, services }: DashboardPanel
           : services.map((service) => (
               <p key={service.service_name}>
                 <span>{serviceLabel(service.service_name)}</span>
+                <em className="service-version">{service.version ? `v${service.version}` : '\u2014'}</em>
                 <b className={`status-${service.status}`}>{statusLabel(service.status)}</b>
               </p>
             ))}

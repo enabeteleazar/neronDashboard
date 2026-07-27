@@ -158,7 +158,9 @@ nav button:hover { background: rgba(255,255,255,.07); color: white; }
 .metric-card strong { display: block; font-size: 27px; margin: 5px 0; }
 .service-list { grid-column: 1 / -1; }
 .service-list h3, .list-panel h3, .memory-panel h3, .vocal-panel h3 { margin: 0 0 12px; }
-.service-list p { display: flex; justify-content: space-between; border-top: 1px solid rgba(255,255,255,.07); padding-top: 10px; color: #ccd4ef; }
+.service-list p { display: grid; grid-template-columns: 1fr 68px 78px; align-items: center; gap: 10px; border-top: 1px solid rgba(255,255,255,.07); padding-top: 10px; color: #ccd4ef; }
+.service-version { font-style: normal; font-size: 11px; color: #7f8aa8; text-align: left; font-variant-numeric: tabular-nums; }
+.service-list b { text-align: right; }
 .service-list b, .list-panel span { color: #69f5a1; font-size: 12px; }
 .list-panel article { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
 .list-panel small { display: block; margin-top: 4px; }
