@@ -1,4 +1,4 @@
-import { Activity, Bot, Cpu, Database, Home, Mic, Server, Settings, Target } from 'lucide-react';
+import { Activity, Bell, Bot, Cpu, Database, Home, MessageSquare, Mic, Server, Settings, Sun, Target, Terminal, Users } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CommandBar } from './components/CommandBar';
 import { FloatingWindow } from './components/FloatingWindow';
@@ -71,13 +71,18 @@ const titles: Record<WindowId, string> = {
   youtube: 'YouTube',
 };
 
-const nav = [
-  { id: 'conversation' as const, label: 'Conversation', icon: Bot },
-  { id: 'dashboard' as const, label: 'Système', icon: Cpu },
-  { id: 'homelab' as const, label: 'Homelab', icon: Server },
-  { id: 'vocal' as const, label: 'Vocal', icon: Mic },
-  { id: 'goals' as const, label: 'Goals', icon: Target },
-  { id: 'memory' as const, label: 'Mémoire', icon: Database },
+type NavItem = { id: string; label: string; icon: typeof Home; target: WindowId | null };
+
+const nav: NavItem[] = [
+  { id: 'home', label: 'Accueil', icon: Home, target: null },
+  { id: 'conversation', label: 'Conversation', icon: MessageSquare, target: 'conversation' },
+  { id: 'goals', label: 'Goals', icon: Target, target: 'goals' },
+  { id: 'agents', label: 'Agents', icon: Users, target: null },
+  { id: 'memory', label: 'Mémoire', icon: Database, target: 'memory' },
+  { id: 'system', label: 'Système', icon: Cpu, target: 'dashboard' },
+  { id: 'homelab', label: 'Homelab', icon: Server, target: 'homelab' },
+  { id: 'vocal', label: 'Vocal', icon: Mic, target: 'vocal' },
+  { id: 'settings', label: 'Paramètres', icon: Settings, target: null },
 ];
 
 type SystemProps = {
@@ -146,6 +151,7 @@ export function NeronConsole() {
   const [windows, setWindows] = useState<Record<WindowId, WindowRuntimeState>>(buildInitialWindows);
   const [topZ, setTopZ] = useState(20);
   const [orbState, setOrbState] = useState<OrbState>('idle');
+  const [clock, setClock] = useState(() => new Date().toLocaleTimeString('fr-FR'));
 
   const [health, setHealth] = useState<NeronHealth | null>(null);
   const [healthError, setHealthError] = useState(false);
@@ -315,25 +321,93 @@ export function NeronConsole() {
     send(command);
   }
 
+  useEffect(() => {
+    const t = window.setInterval(() => setClock(new Date().toLocaleTimeString('fr-FR')), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+
+  const cpu = Math.round(resources?.cpu_pct ?? 0);
+  const ram = Math.round(resources?.ram_pct ?? 0);
+  const disk = Math.round(resources?.disk_pct ?? 0);
+  const activity = Math.round((cpu + ram + disk) / 3);
+  const online = !healthError && status === 'connected';
+
   return (
     <main className="console-shell">
       <aside className="sidebar">
-        <button className="nav-home"><Home size={18} /> Accueil</button>
+        <div className="brand">
+          <div className="brand-orb" />
+          <div>
+            <strong>NéronOS</strong>
+            <small>Home Lab Assistant</small>
+          </div>
+        </div>
+
+        <div className="sidebar-orb"><span /></div>
+
         <nav>
           {nav.map((item) => {
             const Icon = item.icon;
-            return <button key={item.id} onClick={() => openWindow(item.id)}><Icon size={18} /> {item.label}</button>;
+            const active = item.target !== null && openWindows.includes(item.target);
+            return (
+              <button
+                key={item.id}
+                className={active ? 'nav-item active' : 'nav-item'}
+                onClick={() => (item.target ? openWindow(item.target) : setOpenWindows([]))}
+              >
+                <Icon size={17} /> {item.label}
+              </button>
+            );
           })}
         </nav>
-        <div className="sidebar-status">
-          <Activity size={18} />
-          <div><small>{STATUS_LABEL[status] ?? status}</small></div>
+
+        <div className="sidebar-agent">
+          <div className="agent-avatar" />
+          <div>
+            <strong>Néron</strong>
+            <small className={online ? 'ok' : 'ko'}>{STATUS_LABEL[status] ?? status}</small>
+          </div>
+        </div>
+
+        <div className="sidebar-metrics">
+          <div className="metric-line"><span>Activité système</span><b>{activity}%</b></div>
+          <div className="metric-bar"><i style={{ width: activity + '%' }} /></div>
+          <div className="metric-line"><span>Charge CPU</span><b>{cpu}%</b></div>
+          <div className="metric-bar"><i style={{ width: cpu + '%' }} /></div>
+          <div className="metric-line"><span>Mémoire</span><b>{ram}%</b></div>
+          <div className="metric-bar"><i style={{ width: ram + '%' }} /></div>
+          <div className="metric-line"><span>Disque</span><b>{disk}%</b></div>
+          <div className="metric-bar"><i style={{ width: disk + '%' }} /></div>
+        </div>
+
+        <div className="sidebar-footer">
+          <button title="Terminal"><Terminal size={16} /></button>
+          <button title="Thème"><Sun size={16} /></button>
         </div>
       </aside>
 
       <header className="topbar">
-        <div className="wordmark">NÉRON</div>
+        <div className="wordmark-block">
+          <div className="wordmark">NÉRON</div>
+          <div className="version">{health?.version ? `v${health.version}` : '—'}</div>
+        </div>
+        <div className="top-actions">
+          <span className="clock">{clock}</span>
+          <span className={online ? 'pill' : 'pill pill-off'}>● {online ? 'Online' : 'Offline'}</span>
+          <button title="Notifications"><Bell size={17} /></button>
+          <button title="Paramètres"><Settings size={17} /></button>
+        </div>
       </header>
+
+      <div className={'orb-zone orb-' + orbState}>
+        <div className="orb-stage">
+          <div className="orbit orbit-one" />
+          <div className="orbit orbit-two" />
+          <div className="orbit orbit-three" />
+          <div className="orb-core"><div className="orb-glow" /></div>
+          <div className="orb-ring-base" />
+        </div>
+      </div>
 
       {visibleWindows.map((win) => (
         <FloatingWindow
@@ -356,6 +430,21 @@ export function NeronConsole() {
       ))}
 
       <CommandBar onCommand={handleCommand} />
+
+      <div className="dock">
+        <button title="Conversation" onClick={() => openWindow('conversation')}><MessageSquare size={19} /></button>
+        <button title="Goals" onClick={() => openWindow('goals')}><Target size={19} /></button>
+        <button title="Agents" onClick={() => openWindow('vocal')}><Bot size={19} /></button>
+        <button className="dock-orb" title="Accueil" onClick={() => setOpenWindows([])} />
+        <button title="Mémoire" onClick={() => openWindow('memory')}><Database size={19} /></button>
+        <button title="Homelab" onClick={() => openWindow('homelab')}><Server size={19} /></button>
+        <button title="Système" onClick={() => openWindow('dashboard')}><Cpu size={19} /></button>
+      </div>
+
+      <div className={online ? 'status-left' : 'status-left ko'}>
+        <Activity size={13} /> {online ? 'Tous les systèmes opérationnels.' : 'Connexion au Core dégradée.'}
+      </div>
+      <div className="connection-state">● {online ? 'Connecté à Néron Core' : 'Néron Core injoignable'}</div>
     </main>
   );
 }
