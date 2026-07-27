@@ -2,7 +2,7 @@ import { Activity, Bot, Cpu, Database, Home, Mic, Server, Settings, Target } fro
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CommandBar } from './components/CommandBar';
 import { FloatingWindow } from './components/FloatingWindow';
-import { NeronOrb, type OrbState } from './components/NeronOrb';
+export type OrbState = 'idle' | 'thinking' | 'working' | 'alert';
 import { ConversationPanel } from './features/conversation';
 import { HomelabPanel } from './features/homelab';
 import { MemoryPanel } from './features/memory';
@@ -334,10 +334,6 @@ export function NeronConsole() {
       <header className="topbar">
         <div className="wordmark">NÉRON</div>
       </header>
-
-      <section className="orb-zone">
-        <NeronOrb state={orbState} />
-      </section>
 
       {visibleWindows.map((win) => (
         <FloatingWindow

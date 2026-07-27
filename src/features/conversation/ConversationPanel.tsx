@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { ChatMessage, ConnectionStatus } from '../../lib/neronApi';
-import type { OrbState } from '../../components/NeronOrb';
+import type { OrbState } from '../../NeronConsole';
 
 const STATUS_LABEL: Record<string, string> = {
   connecting: 'Connexion…',
