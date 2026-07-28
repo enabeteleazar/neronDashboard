@@ -151,13 +151,30 @@ export type HomelabCatalogItem = {
   description: string;
 };
 
+export type RackOccupant = {
+  key: string;
+  ports: number[];
+  state: 'actif' | 'injoignable' | 'inconnu';
+  foreign: boolean;
+  ram_mb?: number;
+  cpu_percent?: number;
+  uptime_seconds?: number;
+};
+
+export type Rack = {
+  unit: string;
+  host: string;
+  occupants: RackOccupant[];
+};
+
 export type HomelabData = {
   catalog: HomelabCatalogItem[];
   slots: Record<string, string>;
+  racks: Rack[];
 };
 
 export async function getHomelabData(): Promise<HomelabData> {
-  const empty: HomelabData = { catalog: [], slots: {} };
+  const empty: HomelabData = { catalog: [], slots: {}, racks: [] };
   try {
     const headers = new Headers();
     if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);

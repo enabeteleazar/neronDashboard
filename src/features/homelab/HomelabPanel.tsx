@@ -1,8 +1,11 @@
-import { useState } from 'react';
-import type { HomelabData, ServiceRegistration, SystemResources } from '../../lib/neronApi';
-import { setHomelabSlot } from '../../lib/neronApi';
-import { DEFAULT_RACK, UNIT_IDS, type UnitId } from './rackConfig';
-import { HomelabItemModal } from './HomelabItemModal';
+import type {
+  HomelabData,
+  Rack,
+  RackOccupant,
+  ServiceRegistration,
+  SystemResources,
+} from '../../lib/neronApi';
+import { displayFor } from './rackConfig';
 
 type HomelabPanelProps = {
   services: ServiceRegistration[] | null;
@@ -28,13 +31,7 @@ function Gauge({ label, value }: { label: string; value: number | null | undefin
   return (
     <div className="gauge">
       <svg viewBox="0 0 100 56" className="gauge-svg">
-        <path
-          d="M8,50 A42,42 0 0,1 92,50"
-          fill="none"
-          stroke="rgba(255,255,255,.08)"
-          strokeWidth="9"
-          strokeLinecap="round"
-        />
+        <path d="M8,50 A42,42 0 0,1 92,50" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="9" strokeLinecap="round" />
         <path
           d="M8,50 A42,42 0 0,1 92,50"
           fill="none"
@@ -52,71 +49,60 @@ function Gauge({ label, value }: { label: string; value: number | null | undefin
   );
 }
 
-export function HomelabPanel({ resources, homelab, onSlotSaved }: HomelabPanelProps) {
-  const [configuringUnit, setConfiguringUnit] = useState<UnitId | null>(null);
+function dotClass(state: RackOccupant['state']): string {
+  if (state === 'actif') return 'dot-online';
+  if (state === 'injoignable') return 'dot-alert';
+  return 'dot-offline';
+}
 
-  const catalog = homelab?.catalog ?? [];
-  const slots = homelab?.slots ?? {};
+function OccupantRow({ occupant }: { occupant: RackOccupant }) {
+  const display = displayFor(occupant.key);
 
-  function handleSave(unitId: UnitId, catalogId: string | null) {
-    setHomelabSlot(unitId, catalogId).then((ok) => {
-      if (ok) onSlotSaved();
-    });
+  return (
+    <div className="rack-occupant">
+      <span className="rack-occupant-name">
+        <span className={`rack-status-dot ${dotClass(occupant.state)}`} title={occupant.state} />
+        {display.label}
+        {occupant.foreign && <em className="rack-occupant-foreign">tiers</em>}
+      </span>
+      <span className="rack-occupant-ports">
+        {occupant.ports.length ? occupant.ports.join(' · ') : '—'}
+      </span>
+      <span className="rack-occupant-ram">
+        {occupant.ram_mb != null ? `${Math.round(occupant.ram_mb)} Mo` : '—'}
+      </span>
+      <Gauge label="CPU" value={occupant.cpu_percent} />
+    </div>
+  );
+}
+
+function accentFor(rack: Rack): string {
+  return displayFor(rack.occupants[0]?.key ?? '').accentHex;
+}
+
+export function HomelabPanel({ homelab }: HomelabPanelProps) {
+  const racks = homelab?.racks ?? [];
+
+  if (racks.length === 0) {
+    return <div className="rack-panel"><p className="rack-refresh-note">Topologie indisponible.</p></div>;
   }
 
   return (
     <div className="rack-panel">
-      {UNIT_IDS.map((unitId) => {
-        const slot = DEFAULT_RACK[unitId];
-        const assignedId = slots[unitId];
-        const assignedItem = assignedId ? catalog.find((item) => item.id === assignedId) : null;
+      {racks.map((rack) => (
+        <article key={rack.unit} className="rack-slot" style={{ borderLeftColor: accentFor(rack) }}>
+          <div className="rack-slot-header">
+            <span className="rack-unit">{rack.unit}</span>
+            <strong>{rack.host}</strong>
+          </div>
 
-        if (!slot.isReal) {
-          return (
-            <article
-              key={unitId}
-              className={`rack-slot rack-slot-clickable status-offline${assignedItem ? '' : ' rack-slot-empty'}`}
-              onClick={() => setConfiguringUnit(unitId)}
-            >
-              <div className="rack-slot-header">
-                <span className="rack-unit">{unitId}</span>
-                <strong>{assignedItem ? assignedItem.name : 'Emplacement libre'}</strong>
-                <span className={`rack-status-dot ${assignedItem ? 'dot-online' : 'dot-offline'}`} title={assignedItem ? 'configuré' : 'non configuré'} />
-              </div>
-            </article>
-         );
-        }
-
-        return (
-          <article
-            key={unitId}
-            className={`rack-slot rack-slot-clickable status-${slot.status}`}
-            style={{ borderLeftColor: slot.accentHex }}
-            onClick={() => setConfiguringUnit(unitId)}
-          >
-            <div className="rack-slot-header">
-              <span className="rack-unit">{unitId}</span>
-              <strong>{assignedItem ? assignedItem.name : slot.label}</strong>
-              <div className="rack-gauges-row">
-                <Gauge label="CPU" value={resources?.cpu_pct} />
-                <Gauge label="RAM" value={resources?.ram_pct} />
-                <Gauge label="Disque" value={resources?.disk_pct} />
-              </div>
-              <span className={`rack-status-dot dot-${slot.status}`} title={slot.status} />
-            </div>
-          </article>
-        );
-      })}
-
-      {configuringUnit && (
-        <HomelabItemModal
-          unitId={configuringUnit}
-          catalog={catalog}
-          currentCatalogId={slots[configuringUnit] ?? null}
-          onSave={(catalogId) => handleSave(configuringUnit, catalogId)}
-          onClose={() => setConfiguringUnit(null)}
-        />
-      )}
+          <div className="rack-occupants">
+            {rack.occupants.map((occupant) => (
+              <OccupantRow key={occupant.key} occupant={occupant} />
+            ))}
+          </div>
+        </article>
+      ))}
     </div>
   );
 }

@@ -380,10 +380,14 @@ export function NeronConsole() {
           <div className="metric-bar"><i style={{ width: disk + '%' }} /></div>
         </div>
 
+
         <div className="sidebar-footer">
+{/*
           <button title="Terminal"><Terminal size={16} /></button>
           <button title="Thème"><Sun size={16} /></button>
+*/}
         </div>
+
       </aside>
 
       <header className="topbar">
@@ -432,6 +436,7 @@ export function NeronConsole() {
       <CommandBar onCommand={handleCommand} />
 
       <div className="dock">
+{/*
         <button title="Conversation" onClick={() => openWindow('conversation')}><MessageSquare size={19} /></button>
         <button title="Goals" onClick={() => openWindow('goals')}><Target size={19} /></button>
         <button title="Agents" onClick={() => openWindow('vocal')}><Bot size={19} /></button>
@@ -439,6 +444,7 @@ export function NeronConsole() {
         <button title="Mémoire" onClick={() => openWindow('memory')}><Database size={19} /></button>
         <button title="Homelab" onClick={() => openWindow('homelab')}><Server size={19} /></button>
         <button title="Système" onClick={() => openWindow('dashboard')}><Cpu size={19} /></button>
+*/}
       </div>
 
       <div className={online ? 'status-left' : 'status-left ko'}>
