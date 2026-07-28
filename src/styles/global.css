@@ -342,6 +342,7 @@ nav button:hover { background: rgba(255,255,255,.07); color: white; }
 
 .rack-occupants { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 .rack-occupant { display: grid; grid-template-columns: 1fr 74px 58px 30px; align-items: center; gap: 8px; font-size: 12px; color: #ccd4ef; }
-.rack-occupant-name { display: flex; align-items: center; }
+.rack-occupant-name { display: flex; align-items: center; gap: 12px; }
+.rack-occupant-name .rack-status-dot { flex-shrink: 0; }
 .rack-occupant-ports, .rack-occupant-ram { font-size: 11px; color: #7f8aa8; text-align: right; font-variant-numeric: tabular-nums; }
-.rack-occupant-foreign { font-style: normal; font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: #8f9ab9; border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 1px 4px; margin-left: 6px; }
+.rack-occupant-foreign { font-style: normal; font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: #8f9ab9; border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 1px 4px; }
