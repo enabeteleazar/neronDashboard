@@ -346,3 +346,18 @@ nav button:hover { background: rgba(255,255,255,.07); color: white; }
 .rack-occupant-name .rack-status-dot { flex-shrink: 0; }
 .rack-occupant-ports, .rack-occupant-ram { font-size: 11px; color: #7f8aa8; text-align: right; font-variant-numeric: tabular-nums; }
 .rack-occupant-foreign { font-style: normal; font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: #8f9ab9; border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 1px 4px; }
+
+/* Fenêtre Système — états systemd */
+.service-list p > span { display: inline-flex; align-items: center; gap: 0.5rem; }
+.health-dot.health-warn { background: #f5a524; }
+.health-dot.health-idle { background: #6b7280; }
+.unit-restarts { margin-left: 0.35rem; opacity: 0.7; font-size: 0.75em; }
+.unit-state-ok { color: #22c55e; }
+.unit-state-unregistered { color: #7c8aa5; }
+.unit-state-orphan { color: #f5a524; }
+.unit-state-foreign { color: #8b9dc3; }
+.service-list p > b.unit-state { white-space: nowrap; font-size: 0.85em; }
+.service-list p > b.unit-state-ok { color: #22c55e; }
+.service-list p > b.unit-state-unregistered { color: #8494ad; }
+.service-list p > b.unit-state-orphan { color: #f5a524; }
+.service-list p > b.unit-state-foreign { color: #8b9dc3; }

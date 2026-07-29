@@ -2,13 +2,11 @@ import type {
   HomelabData,
   Rack,
   RackOccupant,
-  ServiceRegistration,
   SystemResources,
 } from '../../lib/neronApi';
 import { displayFor } from './rackConfig';
 
 type HomelabPanelProps = {
-  services: ServiceRegistration[] | null;
   resources: SystemResources | null;
   homelab: HomelabData | null;
   onSlotSaved: () => void;

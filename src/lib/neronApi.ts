@@ -235,3 +235,41 @@ export async function transcribeAudio(blob: Blob) {
     STT_URL,
   );
 }
+
+export type SystemdUnit = {
+  key: string;
+  unit: string | null;
+  group: 'applicatif' | 'peripherique' | 'externe';
+  load_state: string;
+  active_state: string;
+  sub_state: string;
+  restarts: number;
+  since: string | null;
+  main_pid: string | null;
+  registered: boolean;
+  state: 'ok' | 'unregistered' | 'orphan' | 'foreign';
+  version: string | null;
+  registry_status: string | null;
+  host: string | null;
+  port: number | null;
+};
+
+export type SystemdData = {
+  available: boolean;
+  reason?: string;
+  units: SystemdUnit[];
+};
+
+export async function getSystemdUnits(): Promise<SystemdData> {
+  const empty: SystemdData = { available: false, units: [] };
+  try {
+    const headers = new Headers();
+    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
+    const response = await fetch(`${API_URL}/self-model`, { headers });
+    if (!response.ok) return empty;
+    const data = await response.json();
+    return data?.systemd ?? empty;
+  } catch {
+    return empty;
+  }
+}

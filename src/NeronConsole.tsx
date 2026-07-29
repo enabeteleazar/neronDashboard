@@ -15,11 +15,11 @@ import { useNeron } from './hooks/useNeron';
 import {
   getHealth,
   getHomelabData,
-  getServices,
+  getSystemdUnits,
   getSystemResources,
   type HomelabData,
   type NeronHealth,
-  type ServiceRegistration,
+  type SystemdData,
   type SystemResources,
 } from './lib/neronApi';
 
@@ -88,7 +88,7 @@ const nav: NavItem[] = [
 type SystemProps = {
   health: NeronHealth | null;
   healthError: boolean;
-  services: ServiceRegistration[] | null;
+  systemd: SystemdData | null;
 };
 
 type ConversationProps = {
@@ -100,7 +100,6 @@ type ConversationProps = {
 };
 
 type HomelabProps = {
-  services: ServiceRegistration[] | null;
   resources: SystemResources | null;
   homelab: HomelabData | null;
   onSlotSaved: () => void;
@@ -155,7 +154,7 @@ export function NeronConsole() {
 
   const [health, setHealth] = useState<NeronHealth | null>(null);
   const [healthError, setHealthError] = useState(false);
-  const [services, setServices] = useState<ServiceRegistration[] | null>(null);
+  const [systemd, setSystemd] = useState<SystemdData | null>(null);
   const [resources, setResources] = useState<SystemResources | null>(null);
   const [homelab, setHomelab] = useState<HomelabData | null>(null);
   const [wikipedia, setWikipedia] = useState<WikipediaData>(null);
@@ -247,22 +246,24 @@ export function NeronConsole() {
         setHomelab(data);
       });
 
-      getServices()
+      getSystemdUnits()
         .then((data) => {
           if (cancelled) return;
-          const list = data.services ?? [];
+          const units = data?.units ?? [];
           const nextStatuses: Record<string, string> = {};
           let changed = false;
-          for (const service of list) {
-            nextStatuses[service.service_name] = service.status;
-            const prev = prevStatuses.current[service.service_name];
-            if (prev !== undefined && prev !== service.status) changed = true;
+          for (const unit of units) {
+            nextStatuses[unit.key] = unit.active_state;
+            if (unit.group !== 'applicatif') continue;
+            const prev = prevStatuses.current[unit.key];
+            const bad = unit.active_state === 'failed' || unit.active_state === 'inactive';
+            if (prev !== undefined && prev !== unit.active_state && bad) changed = true;
           }
           prevStatuses.current = nextStatuses;
-          setServices(list);
+          setSystemd(data);
           if (changed) openWindowRef.current('dashboard');
         })
-        .catch(() => { if (!cancelled) setServices(null); });
+        .catch(() => { if (!cancelled) setSystemd(null); });
     }
 
     poll();
@@ -429,7 +430,7 @@ export function NeronConsole() {
           onFocus={() => bringToFront(win.id)}
           onMove={(x, y) => moveWindow(win.id, x, y)}
         >
-          {renderPanel(win.id, orbState, setOrbState, { health, healthError, services }, { services, resources, homelab, onSlotSaved: () => getHomelabData().then(setHomelab) }, wikipedia, { messages, status, isStreaming, isThinking, clear }, instagram, internet, xData, facebookData, youtubeData)}
+          {renderPanel(win.id, orbState, setOrbState, { health, healthError, systemd }, { resources, homelab, onSlotSaved: () => getHomelabData().then(setHomelab) }, wikipedia, { messages, status, isStreaming, isThinking, clear }, instagram, internet, xData, facebookData, youtubeData)}
         </FloatingWindow>
       ))}
 
