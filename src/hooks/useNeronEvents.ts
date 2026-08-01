@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-const WS_URL = import.meta.env.VITE_NERON_WS_URL ?? 'ws://localhost:18789';
-const TOKEN = import.meta.env.VITE_NERON_TOKEN ?? 'changez_moi';
+import { WS_URL, TOKEN } from '../lib/config';
 const RECONNECT_DELAY_MS = 3000;
 
 export type NeronEvent = {

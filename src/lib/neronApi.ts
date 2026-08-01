@@ -1,6 +1,4 @@
-const API_URL = import.meta.env.VITE_NERON_API_URL ?? 'http://localhost:8010';
-const API_KEY = import.meta.env.VITE_NERON_API_KEY ?? '';
-const STT_URL = import.meta.env.VITE_NERON_STT_URL ?? 'http://localhost:8001';
+import { API_URL, API_KEY, STT_URL } from './config';
 
 type ApiOptions = RequestInit & { auth?: boolean; timeoutMs?: number };
 
