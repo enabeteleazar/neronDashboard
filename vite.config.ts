@@ -28,6 +28,9 @@ if (!apiKey) {
 }
 
 export default defineConfig({
+  // Le Dashboard est servi sous /dashboard/ par Caddy : les assets doivent
+  // etre emis avec ce prefixe, sinon 404 sur tout le bundle.
+  base: '/dashboard/',
   plugins: [react()],
   define: {
     'import.meta.env.VITE_NERON_API_KEY': JSON.stringify(apiKey),
