@@ -47,7 +47,7 @@ const initialLayout: Record<WindowId, Omit<WindowRuntimeState, 'z' | 'minimized'
   homelab: { x: 260, y: 585, width: 430 },
   vocal: { x: 1010, y: 610, width: 390 },
   goals: { x: 760, y: 560, width: 370 },
-  memory: { x: 760, y: 120, width: 370 },
+  memory: { x: 380, y: 120, width: 820 },
   wikipedia: { x: 940, y: 100, width: 460 },
   internet: { x: 940, y: 100, width: 460 },
   facebook: { x: 1420, y: 100, width: 460 },

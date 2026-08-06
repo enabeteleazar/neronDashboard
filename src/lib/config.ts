@@ -7,6 +7,7 @@
 // Bases d'URL : le prefixe est retire par Caddy (handle_path).
 export const API_URL = '/api';
 export const STT_URL = '/stt';
+export const MEMORY_URL = '/memoire';
 
 // WebSocket : URL absolue obligatoire. Suppose un acces via Caddy en HTTPS ;
 // un acces direct sur :4400 ne fonctionnera pas.

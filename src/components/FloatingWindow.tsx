@@ -61,7 +61,9 @@ export function FloatingWindow({
   return (
     <section
       className={`floating-window${minimized ? ' minimized' : ''}`}
-      style={{ left: x, top: y, width, zIndex }}
+      style={{ left: x, top: y, width, zIndex,
+        resize: 'both', overflow: 'auto',
+        minWidth: 320, maxWidth: '95vw', maxHeight: '85vh' }}
       onPointerDown={onFocus}
     >
       <header
