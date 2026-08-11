@@ -71,3 +71,9 @@ JSON-RPC vers la Gateway).
   réelles via `os`) : non porté, car neronWeb reste un SPA statique sans serveur propre.
   Les dossiers `legacy/*` sont conservés intacts si ce backend doit être redéployé
   séparément et exposé au Core plus tard.
+
+## Avatar
+
+Le Dashboard attend un modèle VRM en `public/neron-avatar.vrm`.
+Ce fichier n'est pas versionné (14 Mo, licence du modèle) : le déposer
+manuellement après un clone, sinon l'avatar ne s'affiche pas.
