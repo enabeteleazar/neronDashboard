@@ -2,6 +2,7 @@ import { Activity, Bell, Bot, Cpu, Database, Home, MessageSquare, Mic, Server, S
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CommandBar } from './components/CommandBar';
 import { FloatingWindow } from './components/FloatingWindow';
+import { NeronFace } from './features/face/NeronFace';
 export type OrbState = 'idle' | 'thinking' | 'working' | 'alert';
 import { ConversationPanel } from './features/conversation';
 import { HomelabPanel } from './features/homelab';
@@ -406,11 +407,7 @@ export function NeronConsole() {
 
       <div className={'orb-zone orb-' + orbState}>
         <div className="orb-stage">
-          <div className="orbit orbit-one" />
-          <div className="orbit orbit-two" />
-          <div className="orbit orbit-three" />
-          <div className="orb-core"><div className="orb-glow" /></div>
-          <div className="orb-ring-base" />
+          <NeronFace state={orbState} />
         </div>
       </div>
 

@@ -154,3 +154,6 @@ web/neron-app/tsconfig.tsbuildinfo
 dist/
 tsconfig.tsbuildinfo
 node_modules/
+
+# Modele avatar, depose manuellement (14 Mo)
+public/*.vrm

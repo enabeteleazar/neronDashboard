@@ -1,0 +1,30 @@
+.neron-face {
+  --accent: #7fc4ff;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.neron-face canvas {
+  position: relative;
+  z-index: 1;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.neron-face__halo {
+  position: absolute;
+  inset: -12%;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--accent) 35%, transparent), transparent 62%);
+  animation: nf-halo 5s ease-in-out infinite;
+}
+
+@keyframes nf-halo {
+  0%, 100% { opacity: .45; }
+  50%      { opacity: .95; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .neron-face__halo { animation: none; }
+}
