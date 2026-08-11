@@ -2,6 +2,7 @@
   --accent: #7fc4ff;
   position: relative;
   width: 100%;
+  height: 75%;
   aspect-ratio: 1;
 }
 
@@ -27,4 +28,16 @@
 
 @media (prefers-reduced-motion: reduce) {
   .neron-face__halo { animation: none; }
+}
+
+/* Deplacement doux vers la zone libre */
+.neron-face {
+  will-change: transform;
+  transition: transform 1.2s cubic-bezier(.22, .61, .36, 1);
+}
+
+/* Plan large : l'avatar occupe toute la hauteur du cadre */
+.neron-face {
+  aspect-ratio: auto;
+  height: 100%;
 }
