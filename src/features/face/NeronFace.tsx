@@ -37,7 +37,23 @@ function restPose(vrm: any) {
   set("rightHand", 0, 0, 6 * DEG);
 }
 
-function Head({ state, level, color }: { state: FaceState; level: number; color: string }) {
+type Pointer = { x: number; y: number; t: number };
+
+function Head({
+  state,
+  level,
+  color,
+  pointer,
+}: {
+  state: FaceState;
+  level: number;
+  color: string;
+  pointer: React.MutableRefObject<Pointer>;
+}) {
+  const lookTarget = useMemo(() => new THREE.Object3D(), []);
+  const gaze = useRef(new THREE.Vector2());
+  const saccade = useRef(new THREE.Vector2());
+  const nextSaccade = useRef(0);
   const gltf = useGLTF(MODEL, undefined, undefined, (loader: any) =>
     loader.register((parser: any) => new VRMLoaderPlugin(parser))
   ) as any;
@@ -69,6 +85,7 @@ function Head({ state, level, color }: { state: FaceState; level: number; color:
       vrm.scene.position.sub(p);
     }
     restPose(vrm);
+    if (vrm.lookAt) vrm.lookAt.target = lookTarget;
     vrm.scene.traverse((o: any) => {
       if (o.isMesh) {
         o.frustumCulled = false;
@@ -113,16 +130,37 @@ function Head({ state, level, color }: { state: FaceState; level: number; color:
       vrm.humanoid?.getNormalizedBoneNode("spine");
     if (chest) chest.rotation.x = Math.sin(now * 0.8) * 0.02;
 
+    const wall = performance.now() / 1000;
+    const active = wall - pointer.current.t < 4;
+    const gx = active ? pointer.current.x * 2 : Math.sin(now * 0.35) * 0.22;
+    const gy = active ? pointer.current.y * 2 : Math.sin(now * 0.27) * 0.14;
+
+    if (wall > nextSaccade.current) {
+      nextSaccade.current = wall + 0.3 + Math.random() * 0.9;
+      saccade.current.set((Math.random() - 0.5) * 0.06, (Math.random() - 0.5) * 0.035);
+    }
+
+    const k = Math.min(1, dt * 5);
+    gaze.current.x += (gx + saccade.current.x - gaze.current.x) * k;
+    gaze.current.y += (gy + saccade.current.y - gaze.current.y) * k;
+
+    lookTarget.position.set(gaze.current.x * 0.5, 0.05 + gaze.current.y * 0.35, 1.0);
+
     const head = vrm.humanoid?.getNormalizedBoneNode("head");
     if (head) {
-      head.rotation.y = Math.sin(now * 0.35) * 0.06;
-      head.rotation.x = Math.sin(now * 0.27) * 0.04;
+      head.rotation.y = THREE.MathUtils.clamp(gaze.current.x * 0.45, -0.5, 0.5);
+      head.rotation.x = THREE.MathUtils.clamp(-gaze.current.y * 0.3, -0.3, 0.3);
     }
 
     vrm.update(dt);
   });
 
-  return vrm ? <primitive object={vrm.scene} /> : null;
+  return vrm ? (
+    <>
+      <primitive object={vrm.scene} />
+      <primitive object={lookTarget} />
+    </>
+  ) : null;
 }
 
 export function NeronFace({
@@ -132,6 +170,24 @@ export function NeronFace({
   state?: FaceState;
   level?: number;
 }) {
+  const pointer = useRef<Pointer>({ x: 0, y: 0, t: -99 });
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      pointer.current.x = e.clientX / window.innerWidth - 0.5;
+      pointer.current.y = e.clientY / window.innerHeight - 0.5;
+      pointer.current.t = performance.now() / 1000;
+    };
+    const onLeave = () => {
+      pointer.current.t = -99;
+    };
+    window.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerleave", onLeave);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerleave", onLeave);
+    };
+  }, []);
   return (
     <div className="neron-face" style={{ ["--accent" as any]: COLOR[state] }}>
       <div className="neron-face__halo" />
@@ -142,7 +198,7 @@ export function NeronFace({
       >
         <ambientLight intensity={1} />
         <Suspense fallback={null}>
-          <Head state={state} level={level} color={COLOR[state]} />
+          <Head state={state} level={level} color={COLOR[state]} pointer={pointer} />
         </Suspense>
       </Canvas>
     </div>
