@@ -361,3 +361,11 @@ nav button:hover { background: rgba(255,255,255,.07); color: white; }
 .service-list p > b.unit-state-unregistered { color: #8494ad; }
 .service-list p > b.unit-state-orphan { color: #f5a524; }
 .service-list p > b.unit-state-foreign { color: #8b9dc3; }
+
+
+/* en mode buste, l'orb-zone doit passer AU-DESSUS de la sidebar :
+   le z-index:3 du buste est plafonne par le z-index:1 de son parent */
+.orb-zone:has(.neron-face--bust) { z-index: 20; pointer-events: none; }
+
+/* emplacement vide de la sidebar, occupe par le buste de l'avatar */
+.face-slot { flex: 1 1 auto; min-height: 0; }

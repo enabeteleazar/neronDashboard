@@ -363,6 +363,9 @@ export function NeronConsole() {
           })}
         </nav>
 
+        {/* espace vide reserve : l'avatar vient s'y poser en buste */}
+        <div className="face-slot" />
+
         <div className="sidebar-agent">
           <div className="agent-avatar" />
           <div>
@@ -407,7 +410,7 @@ export function NeronConsole() {
 
       <div className={'orb-zone orb-' + orbState}>
         <div className="orb-stage">
-          <NeronFace state={orbState} />
+          <NeronFace state={orbState} bust />
         </div>
       </div>
 

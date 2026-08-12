@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
@@ -24,6 +24,7 @@ const CADENCE = 10.5;      // vitesse du cycle de jambes
 const TURN = 1.1;         // pivot vers la direction (radians)
 const STRIDE = 0.5;       // amplitude des pas (1 = grandes enjambees)
 const FIT = 1.02;   // marge autour de l'avatar : 1 = colle aux bords
+const FIT_BUST = 1.30;  // marge en mode buste : plus grand = plus de recul
 const DEG = Math.PI / 180;
 const ARM = -80 * DEG;   // ouverture des bras : 90 = T-pose, 0 = colles au corps
 
@@ -53,12 +54,14 @@ function Head({
   color,
   pointer,
   motion,
+  bust,
 }: {
   state: FaceState;
   level: number;
   color: string;
   pointer: React.MutableRefObject<Pointer>;
   motion: React.MutableRefObject<Motion>;
+  bust: boolean;
 }) {
   const rig = useRef<THREE.Group>(null);
   const phase = useRef(0);
@@ -108,23 +111,46 @@ function Head({
     });
   }, [vrm, color]);
 
-  /* Cadre la camera sur la boite englobante du modele, pose comprise. */
+  /* Cadre la camera : corps entier, ou buste quand l'avatar est dans la sidebar. */
   useEffect(() => {
     if (!vrm) return;
-    const box = new THREE.Box3().setFromObject(vrm.scene);
-    if (box.isEmpty()) return;
-    const c = box.getCenter(new THREE.Vector3());
-    const s = box.getSize(new THREE.Vector3());
     const cam = camera as THREE.PerspectiveCamera;
     const half = Math.tan((cam.fov * DEG) / 2);
+    const c = new THREE.Vector3();
+    let sx = 0;
+    let sy = 0;
+
+    if (bust) {
+      /* on ne passe PAS par Box3 : sur un SkinnedMesh la boite est calculee
+         en pose de repos, donc inutilisable pour un cadrage serre. */
+      const bone = (n: string) => vrm.humanoid?.getNormalizedBoneNode(n as any);
+      const top = bone("head");
+      const low = bone("upperChest") ?? bone("chest") ?? bone("spine");
+      if (!top || !low) return;
+      vrm.scene.updateMatrixWorld(true);
+      const a = top.getWorldPosition(new THREE.Vector3());
+      const b = low.getWorldPosition(new THREE.Vector3());
+      sy = Math.abs(a.y - b.y) * 2.6;      // tete + epaules + haut du torse
+      sx = sy * 0.8;
+      c.set(a.x, a.y - sy * 0.16, a.z);    // visage legerement au-dessus du centre
+    } else {
+      const box = new THREE.Box3().setFromObject(vrm.scene);
+      if (box.isEmpty()) return;
+      box.getCenter(c);
+      const s = box.getSize(new THREE.Vector3());
+      sx = s.x;
+      sy = s.y;
+    }
+
+    const fit = bust ? FIT_BUST : FIT;
     const dist = Math.max(
-      (s.y * FIT) / 2 / half,
-      (s.x * FIT) / 2 / half / cam.aspect,
+      (sy * fit) / 2 / half,
+      (sx * fit) / 2 / half / cam.aspect,
     );
     cam.position.set(c.x, c.y, c.z + dist);
     cam.lookAt(c);
     cam.updateProjectionMatrix();
-  }, [vrm, camera, size.width, size.height]);
+  }, [vrm, camera, bust, size.width, size.height]);
 
   useFrame((_, dt) => {
     if (!vrm) return;
@@ -250,15 +276,20 @@ function Head({
 export function NeronFace({
   state = "idle",
   level = 0,
+  bust = false,
 }: {
   state?: FaceState;
   level?: number;
+  bust?: boolean;
 }) {
   const pointer = useRef<Pointer>({ x: 0, y: 0, t: -99 });
   const motion = useRef<Motion>({ dir: 0, active: false });
   const walkTimer = useRef(0);
   const shell = useRef<HTMLDivElement>(null);
   const offset = useRef({ x: 0, y: 0 });
+  const [docked, setDocked] = useState(false);
+  const origin = useRef({ x: 0, y: 0 });   // centre du visage a l'ecran
+  const dockedRef = useRef(false);
 
   /* Deplace l'avatar vers la plus grande zone libre a chaque ouverture/fermeture. */
   useEffect(() => {
@@ -272,6 +303,29 @@ export function NeronFace({
       const r = el.getBoundingClientRect();
       const baseX = r.left + r.width / 2 - offset.current.x;
       const baseY = r.top + r.height / 2 - offset.current.y;
+
+      /* mode buste : on se pose sur l'emplacement vide de la sidebar */
+      const slot = document.querySelector(".face-slot")?.getBoundingClientRect();
+      const canDock = !!(bust && slot && slot.height >= 80 && slot.width >= 60);
+      if (canDock !== dockedRef.current) {
+        dockedRef.current = canDock;
+        setDocked(canDock);
+        schedule();            // remesure une fois la classe appliquee
+        return;
+      }
+      if (bust && !canDock) return;   // slot introuvable : pas de repli au centre
+      if (canDock && slot) {
+        const next = {
+          x: slot.left + slot.width / 2 - baseX,
+          y: slot.top + slot.height / 2 - baseY,
+        };
+        offset.current = next;
+        origin.current = { x: slot.left + slot.width / 2, y: slot.top + slot.height / 2 };
+        motion.current.active = false;
+        el.style.transitionDuration = "0.45s";
+        el.style.transform = `translate(${next.x}px, ${next.y}px)`;
+        return;
+      }
 
       const side = document.querySelector(".sidebar")?.getBoundingClientRect();
       const left = Math.max(z.left, side ? side.right : 0) + 12;
@@ -329,12 +383,16 @@ export function NeronFace({
       mo.disconnect();
       window.removeEventListener("resize", schedule);
     };
-  }, []);
+  }, [bust]);
 
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
-      pointer.current.x = e.clientX / window.innerWidth - 0.5;
-      pointer.current.y = e.clientY / window.innerHeight - 0.5;
+      /* origine = le visage lui-meme, sinon l'avatar colle au bord gauche
+         reste en butee de clamp des que le curseur passe a droite */
+      const ox = origin.current.x || window.innerWidth / 2;
+      const oy = origin.current.y || window.innerHeight / 2;
+      pointer.current.x = (e.clientX - ox) / window.innerWidth;
+      pointer.current.y = (e.clientY - oy) / window.innerHeight;
       pointer.current.t = performance.now() / 1000;
     };
     const onLeave = () => {
@@ -348,7 +406,11 @@ export function NeronFace({
     };
   }, []);
   return (
-    <div ref={shell} className="neron-face" style={{ ["--accent" as any]: COLOR[state] }}>
+    <div
+      ref={shell}
+      className={docked ? "neron-face neron-face--bust" : "neron-face"}
+      style={{ ["--accent" as any]: COLOR[state] }}
+    >
       <div className="neron-face__halo" />
       <Canvas
         camera={{ position: [0, -0.72, 3.0], fov: 30 }}
@@ -357,7 +419,7 @@ export function NeronFace({
       >
         <ambientLight intensity={1} />
         <Suspense fallback={null}>
-          <Head state={state} level={level} color={COLOR[state]} pointer={pointer} motion={motion} />
+          <Head state={state} level={level} color={COLOR[state]} pointer={pointer} motion={motion} bust={docked} />
         </Suspense>
       </Canvas>
     </div>
