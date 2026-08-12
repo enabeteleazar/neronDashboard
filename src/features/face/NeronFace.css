@@ -41,3 +41,16 @@
   aspect-ratio: auto;
   height: 100%;
 }
+
+
+/* --- mode buste dans la sidebar (branche avatar_navbar) --- */
+.neron-face.neron-face--bust {
+  inset: auto;
+  width: 190px;
+  height: 250px;
+  z-index: 3;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 66%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 66%, transparent 100%);
+}
+.neron-face.neron-face--bust .neron-face__halo { opacity: .3; }
