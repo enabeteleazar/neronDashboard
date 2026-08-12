@@ -5,7 +5,6 @@ import * as THREE from "three";
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import type { VRM } from "@pixiv/three-vrm";
 import { makeHologram } from "./hologram";
-import { bestSpot, type Rect } from "./placement";
 import "./NeronFace.css";
 
 export type FaceState = "idle" | "thinking" | "working" | "alert";
@@ -19,10 +18,6 @@ const COLOR: Record<FaceState, string> = {
 
 const MODEL = import.meta.env.BASE_URL + "neron-avatar.vrm";
 
-const WALK_SPEED = 230;   // px par seconde
-const CADENCE = 10.5;      // vitesse du cycle de jambes
-const TURN = 1.1;         // pivot vers la direction (radians)
-const STRIDE = 0.5;       // amplitude des pas (1 = grandes enjambees)
 const FIT = 1.02;   // marge autour de l'avatar : 1 = colle aux bords
 const FIT_BUST = 1.30;  // marge en mode buste : plus grand = plus de recul
 const DEG = Math.PI / 180;
@@ -46,26 +41,20 @@ function restPose(vrm: any) {
 
 type Pointer = { x: number; y: number; t: number };
 
-type Motion = { dir: number; active: boolean };
-
 function Head({
   state,
   level,
   color,
   pointer,
-  motion,
   bust,
 }: {
   state: FaceState;
   level: number;
   color: string;
   pointer: React.MutableRefObject<Pointer>;
-  motion: React.MutableRefObject<Motion>;
   bust: boolean;
 }) {
   const rig = useRef<THREE.Group>(null);
-  const phase = useRef(0);
-  const walk = useRef(0);
   const lookTarget = useMemo(() => new THREE.Object3D(), []);
   const gaze = useRef(new THREE.Vector2());
   const saccade = useRef(new THREE.Vector2());
@@ -184,55 +173,6 @@ function Head({
     if (lu) lu.rotation.z = -ARM + sway;
     if (ru) ru.rotation.z = ARM - sway;
 
-    /* --- cycle de marche --- */
-    const want = motion.current.active ? 1 : 0;
-    walk.current += (want - walk.current) * Math.min(1, dt * 6);
-    if (walk.current > 0.001) phase.current += dt * CADENCE;
-    const w = walk.current;
-    const ph = phase.current;
-    const swing = Math.sin(ph) + 0.18 * Math.sin(2 * ph);
-
-    const leg = (n: string, x: number) => {
-      const o = vrm.humanoid?.getNormalizedBoneNode(n as any);
-      if (o) o.rotation.x = x * w;
-    };
-    leg("leftUpperLeg", swing * 0.55 * STRIDE);
-    leg("rightUpperLeg", -swing * 0.55 * STRIDE);
-    leg("leftLowerLeg", -Math.max(0, -Math.sin(ph - 0.7)) * 0.8 * STRIDE);
-    leg("rightLowerLeg", -Math.max(0, Math.sin(ph - 0.7)) * 0.8 * STRIDE);
-    if (lu) lu.rotation.x = -swing * 0.32 * STRIDE * w;
-    if (ru) ru.rotation.x = swing * 0.32 * STRIDE * w;
-
-    /* details qui font la difference entre marcher et osciller */
-    const b = (n: string) => vrm.humanoid?.getNormalizedBoneNode(n as any);
-    const rot = (n: string, x = 0, y = 0, z = 0) => {
-      const o = b(n);
-      if (o) o.rotation.set(x * w, y * w, z * w);
-    };
-
-    // bassin : rotation dans le plan horizontal + bascule laterale
-    rot("hips", 0.03, -swing * 0.16 * STRIDE, Math.sin(ph + 1.6) * 0.05 * STRIDE);
-    // torse : contre-rotation, c'est elle qui rend la demarche naturelle
-    const spine = b("spine");
-    if (spine) spine.rotation.y = swing * 0.12 * STRIDE * w;
-    const bust = b("chest") ?? b("upperChest");
-    if (bust) bust.rotation.y = swing * 0.16 * STRIDE * w;
-    // pieds : deroule talon-pointe au lieu de rester a plat
-    rot("leftFoot", (0.18 - Math.sin(ph) * 0.32) * STRIDE);
-    rot("rightFoot", (0.18 + Math.sin(ph) * 0.32) * STRIDE);
-    // coudes legerement flechis, en opposition
-    const el = (n: string, v: number) => {
-      const o = b(n);
-      if (o) o.rotation.x = v * w;
-    };
-    el("leftLowerArm", (-0.25 - Math.max(0, -swing) * 0.3) * STRIDE);
-    el("rightLowerArm", (-0.25 - Math.max(0, swing) * 0.3) * STRIDE);
-
-    if (rig.current) {
-      rig.current.position.y = Math.abs(Math.sin(ph)) * 0.022 * w;
-      const yaw = motion.current.active ? motion.current.dir * TURN : 0;
-      rig.current.rotation.y += (yaw - rig.current.rotation.y) * Math.min(1, dt * 3);
-    }
     const chest =
       vrm.humanoid?.getNormalizedBoneNode("chest") ??
       vrm.humanoid?.getNormalizedBoneNode("spine");
@@ -283,8 +223,6 @@ export function NeronFace({
   bust?: boolean;
 }) {
   const pointer = useRef<Pointer>({ x: 0, y: 0, t: -99 });
-  const motion = useRef<Motion>({ dir: 0, active: false });
-  const walkTimer = useRef(0);
   const shell = useRef<HTMLDivElement>(null);
   const offset = useRef({ x: 0, y: 0 });
   const [docked, setDocked] = useState(false);
@@ -321,49 +259,11 @@ export function NeronFace({
         };
         offset.current = next;
         origin.current = { x: slot.left + slot.width / 2, y: slot.top + slot.height / 2 };
-        motion.current.active = false;
         el.style.transitionDuration = "0.45s";
         el.style.transform = `translate(${next.x}px, ${next.y}px)`;
         return;
       }
 
-      const side = document.querySelector(".sidebar")?.getBoundingClientRect();
-      const left = Math.max(z.left, side ? side.right : 0) + 12;
-      const area: Rect = {
-        x: left,
-        y: z.top + 70,
-        w: z.right - left - 12,
-        h: z.height - 70 - 130,   // laisse la barre de commande tranquille
-      };
-
-      const obstacles: Rect[] = Array.from(
-        document.querySelectorAll(".floating-window"),
-      ).map((w) => {
-        const b = w.getBoundingClientRect();
-        return { x: b.left, y: b.top, w: b.width, h: b.height };
-      });
-
-      const target = bestSpot(area, obstacles, { w: r.width, h: r.height }, {
-        x: baseX,
-        y: baseY,
-      });
-
-      const next = { x: target.x - baseX, y: target.y - baseY };
-      const dx = next.x - offset.current.x;
-      const dist = Math.hypot(dx, next.y - offset.current.y);
-      offset.current = next;
-
-      if (dist > 10) {
-        const dur = Math.min(3, Math.max(0.5, dist / WALK_SPEED));
-        el.style.transitionDuration = `${dur}s`;
-        motion.current = { dir: Math.sign(dx) || 1, active: true };
-        window.clearTimeout(walkTimer.current);
-        walkTimer.current = window.setTimeout(() => {
-          motion.current.active = false;
-        }, dur * 1000);
-      }
-
-      el.style.transform = `translate(${next.x}px, ${next.y}px)`;
     };
 
     let timer = 0;
@@ -419,7 +319,7 @@ export function NeronFace({
       >
         <ambientLight intensity={1} />
         <Suspense fallback={null}>
-          <Head state={state} level={level} color={COLOR[state]} pointer={pointer} motion={motion} bust={docked} />
+          <Head state={state} level={level} color={COLOR[state]} pointer={pointer} bust={docked} />
         </Suspense>
       </Canvas>
     </div>
