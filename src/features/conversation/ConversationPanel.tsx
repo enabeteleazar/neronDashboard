@@ -40,7 +40,6 @@ export function ConversationPanel({
 
   return (
     <div className="conversation-shell">
-      <div className={`conversation-status status-${status}`}>{STATUS_LABEL[status] ?? status}</div>
 
       <div className="conversation-panel">
         {messages.length === 0 && (

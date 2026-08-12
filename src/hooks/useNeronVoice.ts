@@ -172,9 +172,12 @@ export function useNeronVoice(): UseNeronVoiceReturn {
     ws.onerror = () => ws.close();
   }, []);
 
+  /* Connexion PARESSEUSE : le hook vit desormais dans la barre de commande,
+     donc monte en permanence. On ne se connecte qu'au premier enregistrement,
+     sinon chaque onglet du Dashboard garderait une WebSocket ouverte et
+     retenterait toutes les 3 s quand le service vocal est arrete. */
   useEffect(() => {
     unmountedRef.current = false;
-    connect();
     return () => {
       unmountedRef.current = true;
       wsRef.current?.close();
@@ -186,6 +189,7 @@ export function useNeronVoice(): UseNeronVoiceReturn {
     setTranscript('');
     setResponseText('');
     unlockAudioPlayback();
+    connect();   // la socket ne sert qu'a l'envoi du clip, a l'arret
 
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setError("Ce navigateur ne supporte pas l'enregistrement audio.");

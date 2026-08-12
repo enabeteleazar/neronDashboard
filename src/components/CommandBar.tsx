@@ -1,8 +1,15 @@
 import { Mic, Send } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
+import { useNeronVoice } from '../hooks/useNeronVoice';
 
 export function CommandBar({ onCommand }: { onCommand: (command: string) => void }) {
   const [value, setValue] = useState('');
+  const { state, transcript, error, toggle } = useNeronVoice();
+
+  /* la dictee remplit le champ au fil de l'eau */
+  useEffect(() => {
+    if (transcript) setValue(transcript);
+  }, [transcript]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -14,7 +21,15 @@ export function CommandBar({ onCommand }: { onCommand: (command: string) => void
 
   return (
     <form className="command-bar" onSubmit={submit}>
-      <Mic size={20} />
+      <button
+        type="button"
+        className={'cmd-mic cmd-mic--' + state}
+        onClick={toggle}
+        title={error ?? undefined}
+        aria-label={state === 'listening' ? 'Arreter la dictee' : 'Dicter'}
+      >
+        <Mic size={20} />
+      </button>
       <input
         value={value}
         onChange={(event) => setValue(event.target.value)}

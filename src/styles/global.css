@@ -12,8 +12,10 @@ button, input { font: inherit; }
 .console-shell {
   position: relative;
   width: 100vw;
-  height: 100vh;
-  overflow: hidden;
+  height: 100dvh;
+  /* clip et non hidden : hidden cree un conteneur de defilement que le
+     navigateur fait defiler pour suivre le focus a l'ouverture d'une fenetre */
+  overflow: clip;
   background:
     radial-gradient(circle at 50% 52%, rgba(89, 66, 255, .22), transparent 34%),
     radial-gradient(circle at 80% 20%, rgba(0, 211, 255, .13), transparent 24%),
@@ -369,3 +371,16 @@ nav button:hover { background: rgba(255,255,255,.07); color: white; }
 
 /* emplacement vide de la sidebar, occupe par le buste de l'avatar */
 .face-slot { flex: 1 1 auto; min-height: 0; }
+
+/* entrees de menu sans fenetre associee */
+.nav-item-off { opacity: .35; cursor: default; pointer-events: none; }
+
+/* micro de la barre de commande : porte l'etat du vocal, discretement */
+.command-bar .cmd-mic { display: grid; place-items: center; width: 30px; height: 30px; padding: 0;
+  border: 0; border-radius: 50%; background: none; cursor: pointer;
+  color: #7f8aa8; transition: color .25s, background .25s; }
+.command-bar .cmd-mic:hover { color: #cdd6f4; }
+.command-bar .cmd-mic--listening { color: #69f5a1; background: rgba(105,245,161,.12); }
+.command-bar .cmd-mic--processing { color: #a892ff; }
+.command-bar .cmd-mic--speaking { color: #5ee7ff; }
+.command-bar .cmd-mic--error { color: #ff8080; }

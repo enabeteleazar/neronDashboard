@@ -42,7 +42,10 @@ const STATUS_LABEL: Record<string, string> = {
   error: 'Erreur de connexion',
 };
 
-const initialLayout: Record<WindowId, Omit<WindowRuntimeState, 'z' | 'minimized' | 'pinned'>> = {
+type Box = Omit<WindowRuntimeState, 'z' | 'minimized' | 'pinned'>;
+
+/* Mise en page d'origine, pensee pour un grand ecran. */
+const rawLayout: Record<WindowId, Box> = {
   conversation: { x: 270, y: 110, width: 430 },
   dashboard: { x: 980, y: 110, width: 470 },
   homelab: { x: 260, y: 585, width: 430 },
@@ -56,6 +59,29 @@ const initialLayout: Record<WindowId, Omit<WindowRuntimeState, 'z' | 'minimized'
   x: { x: 1420, y: 540, width: 460 },
   youtube: { x: 1420, y: 760, width: 460 },
 };
+
+/* Ramene la mise en page dans le viewport reel : sans ca, les fenetres
+   posees a x:1420 s'ouvrent hors champ sur un ecran de 1280. */
+const SIDEBAR_W = 220;
+const GAP = 16;
+const TOP = 96;
+
+function clampLayout(src: Record<WindowId, Box>): Record<WindowId, Box> {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const out = {} as Record<WindowId, Box>;
+  (Object.keys(src) as WindowId[]).forEach((id) => {
+    const b = src[id];
+    const width = Math.max(280, Math.min(b.width, vw - SIDEBAR_W - GAP * 2));
+    const maxX = Math.max(SIDEBAR_W + GAP, vw - width - GAP);
+    const x = Math.min(Math.max(b.x, SIDEBAR_W + GAP), maxX);
+    const y = Math.min(Math.max(b.y, TOP), Math.max(TOP, vh - 220));
+    out[id] = { ...b, x, y, width };
+  });
+  return out;
+}
+
+const initialLayout: Record<WindowId, Box> = clampLayout(rawLayout);
 
 const titles: Record<WindowId, string> = {
   conversation: 'Conversation',
@@ -345,16 +371,20 @@ export function NeronConsole() {
           </div>
         </div>
 
-        <div className="sidebar-orb"><span /></div>
-
         <nav>
           {nav.map((item) => {
             const Icon = item.icon;
             const active = item.target !== null && openWindows.includes(item.target);
+            /* pas de fenetre associee et pas d'action : entree grisee */
+            const dead = item.target === null && item.id !== 'home';
             return (
               <button
                 key={item.id}
-                className={active ? 'nav-item active' : 'nav-item'}
+                disabled={dead}
+                title={dead ? 'Bientot disponible' : undefined}
+                className={
+                  dead ? 'nav-item nav-item-off' : active ? 'nav-item active' : 'nav-item'
+                }
                 onClick={() => (item.target ? openWindow(item.target) : setOpenWindows([]))}
               >
                 <Icon size={17} /> {item.label}
@@ -365,14 +395,6 @@ export function NeronConsole() {
 
         {/* espace vide reserve : l'avatar vient s'y poser en buste */}
         <div className="face-slot" />
-
-        <div className="sidebar-agent">
-          <div className="agent-avatar" />
-          <div>
-            <strong>Néron</strong>
-            <small className={online ? 'ok' : 'ko'}>{STATUS_LABEL[status] ?? status}</small>
-          </div>
-        </div>
 
         <div className="sidebar-metrics">
           <div className="metric-line"><span>Activité système</span><b>{activity}%</b></div>
@@ -397,15 +419,16 @@ export function NeronConsole() {
 
       <header className="topbar">
         <div className="wordmark-block">
-          <div className="wordmark">NÉRON</div>
-          <div className="version">{health?.version ? `v${health.version}` : '—'}</div>
+          <span className={online ? 'pill' : 'pill pill-off'}>● {online ? 'Online' : 'Offline'}</span>
         </div>
+{/*
         <div className="top-actions">
           <span className="clock">{clock}</span>
           <span className={online ? 'pill' : 'pill pill-off'}>● {online ? 'Online' : 'Offline'}</span>
           <button title="Notifications"><Bell size={17} /></button>
           <button title="Paramètres"><Settings size={17} /></button>
         </div>
+*/}
       </header>
 
       <div className={'orb-zone orb-' + orbState}>
@@ -435,9 +458,8 @@ export function NeronConsole() {
       ))}
 
       <CommandBar onCommand={handleCommand} />
-
-      <div className="dock">
 {/*
+      <div className="dock">
         <button title="Conversation" onClick={() => openWindow('conversation')}><MessageSquare size={19} /></button>
         <button title="Goals" onClick={() => openWindow('goals')}><Target size={19} /></button>
         <button title="Agents" onClick={() => openWindow('vocal')}><Bot size={19} /></button>
@@ -445,13 +467,8 @@ export function NeronConsole() {
         <button title="Mémoire" onClick={() => openWindow('memory')}><Database size={19} /></button>
         <button title="Homelab" onClick={() => openWindow('homelab')}><Server size={19} /></button>
         <button title="Système" onClick={() => openWindow('dashboard')}><Cpu size={19} /></button>
+      </div>
 */}
-      </div>
-
-      <div className={online ? 'status-left' : 'status-left ko'}>
-        <Activity size={13} /> {online ? 'Tous les systèmes opérationnels.' : 'Connexion au Core dégradée.'}
-      </div>
-      <div className="connection-state">● {online ? 'Connecté à Néron Core' : 'Néron Core injoignable'}</div>
     </main>
   );
 }
