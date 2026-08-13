@@ -43,6 +43,12 @@ export type UseNeronVoiceReturn = {
   responseText: string;
   error: string | null;
   toggle: () => void;
+  /** Demarre l'ecoute explicitement (talkie-walkie clavier). */
+  start: () => void;
+  /** Arrete l'ecoute et ENVOIE le clip (talkie-walkie clavier). */
+  stop: () => void;
+  /** Arrete l'ecoute SANS envoyer — annule un raccourci accidentel (ex. Ctrl+C). */
+  cancel: () => void;
 };
 
 export function useNeronVoice(): UseNeronVoiceReturn {
@@ -272,5 +278,29 @@ export function useNeronVoice(): UseNeronVoiceReturn {
     // 'processing'/'speaking' : le tap ne fait rien (comme avant).
   }, [state, startRecording, stopAndSend]);
 
-  return { state, transcript, responseText, error, toggle };
+  /* Annule sans envoyer : coupe le micro et jette le clip. Utilise pour
+     desamorcer un raccourci clavier accidentel (Ctrl+C, Ctrl+V...) quand
+     Ctrl seul sert de talkie-walkie. */
+  const cancel = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === 'inactive') return;
+    recorder.onstop = () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      chunksRef.current = [];
+      setState('idle');
+    };
+    recorder.stop();
+  }, []);
+
+  return {
+    state,
+    transcript,
+    responseText,
+    error,
+    toggle,
+    start: startRecording,
+    stop: stopAndSend,
+    cancel,
+  };
 }
