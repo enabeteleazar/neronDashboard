@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage, ConnectionStatus } from '../lib/neronApi';
+import { getDeviceId, ensureDeviceLabel } from '../lib/device';
 
 import { WS_URL, TOKEN } from '../lib/config';
 const RECONNECT_DELAY_MS = 3000;
@@ -13,6 +14,8 @@ export type UseNeronReturn = {
   status: ConnectionStatus;
   isStreaming: boolean;
   isThinking: boolean;
+  /** True si l'avatar (presence multi-appareils) est actif SUR CET appareil. */
+  isPresent: boolean;
   send: (text: string) => void;
   clear: () => void;
 };
@@ -22,6 +25,8 @@ export function useNeron(): UseNeronReturn {
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
   const [isStreaming, setIsStreaming] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const [isPresent, setIsPresent] = useState(false);
+  const deviceIdRef = useRef(getDeviceId());
 
   const wsRef = useRef<WebSocket | null>(null);
   const rpcIdRef = useRef(0);
@@ -49,6 +54,10 @@ export function useNeron(): UseNeronReturn {
       setStatus('connected');
       try {
         await rpc('gateway.auth', { token: TOKEN });
+        await rpc('device.announce', {
+          device_id: deviceIdRef.current,
+          device_label: ensureDeviceLabel(),
+        });
         await rpc('session.new', {
           session_id: sessionIdRef.current,
           system: 'Tu es Néron, un assistant IA local. Tu réponds en français.',
@@ -80,6 +89,11 @@ export function useNeron(): UseNeronReturn {
       const data = (frame.data ?? {}) as Record<string, unknown>;
 
       if (eventName === 'gateway.auth_required') return;
+
+      if (eventName === 'presence.changed') {
+        setIsPresent((data.device_id as string | undefined) === deviceIdRef.current);
+        return;
+      }
 
       if (eventName === 'agent.token') {
         const token = (data.token as string) ?? '';
@@ -173,5 +187,5 @@ export function useNeron(): UseNeronReturn {
 
   const clear = useCallback(() => setMessages([]), []);
 
-  return { messages, status, isStreaming, isThinking, send, clear };
+  return { messages, status, isStreaming, isThinking, isPresent, send, clear };
 }

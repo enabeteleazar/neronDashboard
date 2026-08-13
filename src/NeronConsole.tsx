@@ -196,7 +196,7 @@ export function NeronConsole() {
   const inactivityTimerRef = useRef<number | null>(null);
 
   const lastEvent = useNeronEvents();
-  const { messages, status, isStreaming, isThinking, send, clear } = useNeron();
+  const { messages, status, isStreaming, isThinking, isPresent, send, clear } = useNeron();
 
   const visibleWindows = useMemo(
     () => openWindows.map((id) => ({ id, ...windows[id] })),
@@ -432,7 +432,7 @@ export function NeronConsole() {
 
       <div className={'orb-zone orb-' + orbState}>
         <div className="orb-stage">
-          <NeronFace state={orbState} bust />
+          <NeronFace state={orbState} bust present={isPresent} />
         </div>
       </div>
 
