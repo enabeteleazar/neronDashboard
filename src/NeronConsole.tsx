@@ -108,7 +108,6 @@ const nav: NavItem[] = [
   { id: 'memory', label: 'Mémoire', icon: Database, target: 'memory' },
   { id: 'system', label: 'Système', icon: Cpu, target: 'dashboard' },
   { id: 'homelab', label: 'Homelab', icon: Server, target: 'homelab' },
-  { id: 'vocal', label: 'Vocal', icon: Mic, target: 'vocal' },
   { id: 'settings', label: 'Paramètres', icon: Settings, target: null },
 ];
 
