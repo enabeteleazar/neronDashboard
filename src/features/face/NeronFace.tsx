@@ -217,10 +217,13 @@ export function NeronFace({
   state = "idle",
   level = 0,
   bust = false,
+  present = true,
 }: {
   state?: FaceState;
   level?: number;
   bust?: boolean;
+  /** Presence multi-appareils : false = estompe/reduit, JAMAIS demonte. */
+  present?: boolean;
 }) {
   const pointer = useRef<Pointer>({ x: 0, y: 0, t: -99 });
   const shell = useRef<HTMLDivElement>(null);
@@ -308,7 +311,11 @@ export function NeronFace({
   return (
     <div
       ref={shell}
-      className={docked ? "neron-face neron-face--bust" : "neron-face"}
+      className={[
+        "neron-face",
+        docked && "neron-face--bust",
+        !present && "neron-face--hidden",
+      ].filter(Boolean).join(" ")}
       style={{ ["--accent" as any]: COLOR[state] }}
     >
       <div className="neron-face__halo" />
@@ -316,6 +323,10 @@ export function NeronFace({
         camera={{ position: [0, -0.72, 3.0], fov: 30 }}
         dpr={[1, 2]}
         gl={{ alpha: true, antialias: true }}
+        /* Coupe completement la boucle de rendu quand cet appareil n'a pas
+           la presence : sans ca, le VRM entier (os, regard, clignement)
+           continue de tourner a plein regime pour un rendu invisible. */
+        frameloop={present ? "always" : "never"}
       >
         <ambientLight intensity={1} />
         <Suspense fallback={null}>
