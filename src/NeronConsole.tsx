@@ -1,8 +1,12 @@
 import { Activity, Bell, Bot, Cpu, Database, Home, MessageSquare, Mic, Server, Settings, Sun, Target, Terminal, Users } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { CommandBar } from './components/CommandBar';
 import { FloatingWindow } from './components/FloatingWindow';
-import { NeronFace } from './features/face/NeronFace';
+// Charge three.js/@pixiv/three-vrm/r3f a l'execution seulement : ces
+// dependances pesaient a elles seules ~1,1 Mo du bundle principal.
+const NeronFace = lazy(() =>
+  import('./features/face/NeronFace').then((m) => ({ default: m.NeronFace })),
+);
 export type OrbState = 'idle' | 'thinking' | 'working' | 'alert';
 import { ConversationPanel } from './features/conversation';
 import { HomelabPanel } from './features/homelab';
@@ -432,7 +436,9 @@ export function NeronConsole() {
 
       <div className={'orb-zone orb-' + orbState}>
         <div className="orb-stage">
-          <NeronFace state={orbState} bust present={isPresent} />
+          <Suspense fallback={null}>
+            <NeronFace state={orbState} bust present={isPresent} />
+          </Suspense>
         </div>
       </div>
 
