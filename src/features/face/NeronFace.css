@@ -30,10 +30,20 @@
   .neron-face__halo { animation: none; }
 }
 
-/* Deplacement doux vers la zone libre */
+/* Deplacement doux vers la zone libre, et fondu de presence multi-appareils */
 .neron-face {
-  will-change: transform;
-  transition: transform 1.2s cubic-bezier(.22, .61, .36, 1);
+  will-change: transform, opacity;
+  transition: transform 1.2s cubic-bezier(.22, .61, .36, 1), opacity .5s ease, scale .5s ease;
+}
+
+/* Presence multi-appareils (chantier avatar_presence) : jamais demonte,
+   seulement estompe + reduit quand cet appareil n'a pas la presence — le
+   canvas WebGL reste vivant en arriere-plan, pret a revenir instantanement
+   sans recharger le VRM (14 Mo). */
+.neron-face.neron-face--hidden {
+  opacity: 0;
+  scale: .82;
+  pointer-events: none;
 }
 
 /* Plan large : l'avatar occupe toute la hauteur du cadre */
