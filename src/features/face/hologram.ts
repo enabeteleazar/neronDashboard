@@ -1,13 +1,14 @@
-import * as THREE from "three";
+import { Color, FrontSide, Material, MeshLambertMaterial, NormalBlending } from "three";
+import type { ColorRepresentation } from "three";
 
 /** Rendu hologramme : texture d'origine en luminance teintee + fresnel de bord. */
 export function makeHologram(
-  src: THREE.Material | THREE.Material[],
-  color: THREE.ColorRepresentation,
+  src: Material | Material[],
+  color: ColorRepresentation,
 ) {
   const build = (from: any) => {
     const tex = from?.map ?? null;
-    const m = new THREE.MeshLambertMaterial({
+    const m = new MeshLambertMaterial({
       color: 0x000000,
       emissive: 0xffffff,
       emissiveMap: tex,
@@ -15,11 +16,11 @@ export function makeHologram(
       transparent: false,
       alphaTest: 0.5,          // decoupe des cheveux, sans empilement
       depthWrite: true,
-      blending: THREE.NormalBlending,
-      side: THREE.FrontSide,
+      blending: NormalBlending,
+      side: FrontSide,
     });
     m.onBeforeCompile = (shader) => {
-      shader.uniforms.uTint = { value: new THREE.Color(color) };
+      shader.uniforms.uTint = { value: new Color(color) };
       shader.vertexShader =
         "varying vec3 vNrm;\nvarying vec3 vDir;\n" +
         shader.vertexShader.replace(

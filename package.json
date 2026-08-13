@@ -26,6 +26,7 @@
   "devDependencies": {
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "@types/three": "^0.185.1"
+    "@types/three": "^0.185.1",
+    "rollup-plugin-visualizer": "^7.0.1"
   }
 }

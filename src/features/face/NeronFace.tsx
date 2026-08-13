@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
-import * as THREE from "three";
+import { Box3, Group, MathUtils, Object3D, PerspectiveCamera, Vector2, Vector3 } from "three";
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import type { VRM } from "@pixiv/three-vrm";
 import { makeHologram } from "./hologram";
@@ -54,10 +54,10 @@ function Head({
   pointer: React.MutableRefObject<Pointer>;
   bust: boolean;
 }) {
-  const rig = useRef<THREE.Group>(null);
-  const lookTarget = useMemo(() => new THREE.Object3D(), []);
-  const gaze = useRef(new THREE.Vector2());
-  const saccade = useRef(new THREE.Vector2());
+  const rig = useRef<Group>(null);
+  const lookTarget = useMemo(() => new Object3D(), []);
+  const gaze = useRef(new Vector2());
+  const saccade = useRef(new Vector2());
   const nextSaccade = useRef(0);
   const gltf = useGLTF(MODEL, undefined, undefined, (loader: any) =>
     loader.register((parser: any) => new VRMLoaderPlugin(parser))
@@ -86,7 +86,7 @@ function Head({
     vrm.scene.updateMatrixWorld(true);
     const head = vrm.humanoid?.getNormalizedBoneNode("head");
     if (head) {
-      const p = new THREE.Vector3();
+      const p = new Vector3();
       head.getWorldPosition(p);
       vrm.scene.position.sub(p);
     }
@@ -103,9 +103,9 @@ function Head({
   /* Cadre la camera : corps entier, ou buste quand l'avatar est dans la sidebar. */
   useEffect(() => {
     if (!vrm) return;
-    const cam = camera as THREE.PerspectiveCamera;
+    const cam = camera as PerspectiveCamera;
     const half = Math.tan((cam.fov * DEG) / 2);
-    const c = new THREE.Vector3();
+    const c = new Vector3();
     let sx = 0;
     let sy = 0;
 
@@ -117,16 +117,16 @@ function Head({
       const low = bone("upperChest") ?? bone("chest") ?? bone("spine");
       if (!top || !low) return;
       vrm.scene.updateMatrixWorld(true);
-      const a = top.getWorldPosition(new THREE.Vector3());
-      const b = low.getWorldPosition(new THREE.Vector3());
+      const a = top.getWorldPosition(new Vector3());
+      const b = low.getWorldPosition(new Vector3());
       sy = Math.abs(a.y - b.y) * 2.6;      // tete + epaules + haut du torse
       sx = sy * 0.8;
       c.set(a.x, a.y - sy * 0.16, a.z);    // visage legerement au-dessus du centre
     } else {
-      const box = new THREE.Box3().setFromObject(vrm.scene);
+      const box = new Box3().setFromObject(vrm.scene);
       if (box.isEmpty()) return;
       box.getCenter(c);
-      const s = box.getSize(new THREE.Vector3());
+      const s = box.getSize(new Vector3());
       sx = s.x;
       sy = s.y;
     }
@@ -196,8 +196,8 @@ function Head({
 
     const head = vrm.humanoid?.getNormalizedBoneNode("head");
     if (head) {
-      head.rotation.y = THREE.MathUtils.clamp(gaze.current.x * 0.45, -0.5, 0.5);
-      head.rotation.x = THREE.MathUtils.clamp(-gaze.current.y * 0.3, -0.3, 0.3);
+      head.rotation.y = MathUtils.clamp(gaze.current.x * 0.45, -0.5, 0.5);
+      head.rotation.x = MathUtils.clamp(-gaze.current.y * 0.3, -0.3, 0.3);
     }
 
     vrm.update(dt);

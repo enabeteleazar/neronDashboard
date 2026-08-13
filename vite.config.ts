@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import react from '@vitejs/plugin-react'
+import { visualizer } from 'rollup-plugin-visualizer';
 import { readFileSync } from 'node:fs';
 
 // Source unique des secrets : le fichier designe par NERON_SECRETS_PATH,
@@ -31,7 +32,7 @@ export default defineConfig({
   // Le Dashboard est servi sous /dashboard/ par Caddy : les assets doivent
   // etre emis avec ce prefixe, sinon 404 sur tout le bundle.
   base: '/dashboard/',
-  plugins: [react()],
+  plugins: [react(), visualizer({ filename: 'dist/stats.html', gzipSize: true, brotliSize: true })],
   define: {
     'import.meta.env.VITE_NERON_API_KEY': JSON.stringify(apiKey),
     'import.meta.env.VITE_NERON_TOKEN': JSON.stringify(apiKey),
