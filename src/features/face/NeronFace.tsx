@@ -230,6 +230,11 @@ export function NeronFace({
   const offset = useRef({ x: 0, y: 0 });
   const [docked, setDocked] = useState(false);
   const origin = useRef({ x: 0, y: 0 });   // centre du visage a l'ecran
+  // Memorise le dernier slot utilise : evite de re-mesurer/re-transformer
+  // a chaque mutation DOM sans rapport (streaming de tokens, jauges...),
+  // ce qui pouvait capturer l'element EN PLEIN MILIEU d'une transition
+  // de position et fausser durablement le calcul (~10px de derive constatee).
+  const lastSlotRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   const dockedRef = useRef(false);
 
   /* Deplace l'avatar vers la plus grande zone libre a chaque ouverture/fermeture. */
@@ -256,6 +261,15 @@ export function NeronFace({
       }
       if (bust && !canDock) return;   // slot introuvable : pas de repli au centre
       if (canDock && slot) {
+        const prev = lastSlotRef.current;
+        const unchanged = prev
+          && Math.abs(prev.x - slot.left) < 1
+          && Math.abs(prev.y - slot.top) < 1
+          && Math.abs(prev.w - slot.width) < 1
+          && Math.abs(prev.h - slot.height) < 1;
+        if (unchanged) return;   // deja bien positionne : ne pas re-mesurer en vol
+        lastSlotRef.current = { x: slot.left, y: slot.top, w: slot.width, h: slot.height };
+
         const next = {
           x: slot.left + slot.width / 2 - baseX,
           y: slot.top + slot.height / 2 - baseY,
