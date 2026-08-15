@@ -1,23 +1,48 @@
 import { Mic, Send } from 'lucide-react';
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { useNeronVoice } from '../hooks/useNeronVoice';
+import type { VoiceState } from '../hooks/useNeron';
 
-export function CommandBar({ onCommand }: { onCommand: (command: string) => void }) {
+export function CommandBar({
+  onCommand,
+  voiceState,
+  voiceTranscript,
+  voiceError,
+  voiceToggle,
+  voiceStart,
+  voiceStop,
+  voiceCancel,
+}: {
+  onCommand: (command: string) => void;
+  voiceState: VoiceState;
+  voiceTranscript: string;
+  voiceError: string | null;
+  voiceToggle: () => void;
+  voiceStart: () => void;
+  voiceStop: () => void;
+  voiceCancel: () => void;
+}) {
   const [value, setValue] = useState('');
-  const { state, transcript, error, toggle, start, stop, cancel } = useNeronVoice();
 
   /* la dictee remplit le champ au fil de l'eau */
   useEffect(() => {
-    if (transcript) setValue(transcript);
-  }, [transcript]);
+    if (voiceTranscript) setValue(voiceTranscript);
+  }, [voiceTranscript]);
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const command = value.trim();
+    if (!command) return;
+    onCommand(command);
+    setValue('');
+  }
 
   /* Talkie-walkie au clavier : Ctrl seul maintenu = ecoute, relachement = envoi.
      Si une autre touche est pressee pendant que Ctrl est tenu (Ctrl+C, Ctrl+V...),
      c'est un raccourci clavier normal : on annule SANS envoyer. */
-  const stateRef = useRef(state);
+  const stateRef = useRef(voiceState);
   useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
+    stateRef.current = voiceState;
+  }, [voiceState]);
 
   useEffect(() => {
     const ctrlHeldRef = { current: false };
@@ -26,26 +51,26 @@ export function CommandBar({ onCommand }: { onCommand: (command: string) => void
       if (e.key === 'Control') {
         if (e.repeat || ctrlHeldRef.current) return;
         const s = stateRef.current;
-        if (s !== 'idle' && s !== 'error') return;   // deja en cours
+        if (s !== 'idle' && s !== 'error') return;
         ctrlHeldRef.current = true;
-        start();
+        voiceStart();
         return;
       }
       if (ctrlHeldRef.current) {
-        ctrlHeldRef.current = false;   // combo clavier : ce n'est pas un talkie-walkie
-        cancel();
+        ctrlHeldRef.current = false;
+        voiceCancel();
       }
     }
     function onKeyUp(e: KeyboardEvent) {
       if (e.key === 'Control' && ctrlHeldRef.current) {
         ctrlHeldRef.current = false;
-        stop();
+        voiceStop();
       }
     }
     function onBlur() {
       if (ctrlHeldRef.current) {
         ctrlHeldRef.current = false;
-        cancel();   // alt-tab pendant l'ecoute : on n'envoie pas un clip coupe
+        voiceCancel();
       }
     }
 
@@ -57,24 +82,16 @@ export function CommandBar({ onCommand }: { onCommand: (command: string) => void
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [start, stop, cancel]);
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    const command = value.trim();
-    if (!command) return;
-    onCommand(command);
-    setValue('');
-  }
+  }, [voiceStart, voiceStop, voiceCancel]);
 
   return (
     <form className="command-bar" onSubmit={submit}>
       <button
         type="button"
-        className={'cmd-mic cmd-mic--' + state}
-        onClick={toggle}
-        title={error ?? undefined}
-        aria-label={state === 'listening' ? 'Arreter la dictee' : 'Dicter'}
+        className={'cmd-mic cmd-mic--' + voiceState}
+        onClick={voiceToggle}
+        title={voiceError ?? undefined}
+        aria-label={voiceState === 'listening' ? 'Arreter la dictee' : 'Dicter'}
       >
         <Mic size={20} />
       </button>
