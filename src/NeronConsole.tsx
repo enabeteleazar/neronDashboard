@@ -1,4 +1,4 @@
-import { Activity, Bell, Bot, Cpu, Database, Home, MessageSquare, Mic, Server, Settings, Sun, Target, Terminal, Users } from 'lucide-react';
+import { Activity, Bell, Bot, Cpu, Database, Home, MessageSquare, Mic, Printer, Server, Settings, Sun, Target, Terminal, Users } from 'lucide-react';
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { CommandBar } from './components/CommandBar';
 import { FloatingWindow } from './components/FloatingWindow';
@@ -10,25 +10,27 @@ const NeronFace = lazy(() =>
 export type OrbState = 'idle' | 'thinking' | 'working' | 'alert';
 import { ConversationPanel } from './features/conversation';
 import { HomelabPanel } from './features/homelab';
+import { PrintPanel } from './features/print';
 import { MemoryPanel } from './features/memory';
 import { SelfModelPanel } from './features/selfmodel';
 import { SystemPanel } from './features/system';
-import { VocalPanel } from './features/vocal';
 import { WikipediaPanel, type WikipediaData } from './features/wikipedia/WikipediaPanel';
 import { useNeronEvents } from './hooks/useNeronEvents';
 import { useNeron } from './hooks/useNeron';
 import {
   getHealth,
   getHomelabData,
+  getPrintData,
   getSystemdUnits,
   getSystemResources,
   type HomelabData,
+  type PrintData,
   type NeronHealth,
   type SystemdData,
   type SystemResources,
 } from './lib/neronApi';
 
-type WindowId = 'conversation' | 'dashboard' | 'homelab' | 'vocal' | 'goals' | 'memory' | 'wikipedia' | 'instagram' | 'internet' | 'x' | 'facebook' | 'youtube';
+type WindowId = 'conversation' | 'dashboard' | 'homelab' | 'print' | 'goals' | 'memory' | 'wikipedia' | 'instagram' | 'internet' | 'x' | 'facebook' | 'youtube';
 
 type WindowRuntimeState = {
   x: number;
@@ -53,7 +55,7 @@ const rawLayout: Record<WindowId, Box> = {
   conversation: { x: 270, y: 110, width: 430 },
   dashboard: { x: 980, y: 110, width: 470 },
   homelab: { x: 260, y: 585, width: 430 },
-  vocal: { x: 1010, y: 610, width: 390 },
+  print: { x: 260, y: 585, width: 430 },
   goals: { x: 760, y: 560, width: 370 },
   memory: { x: 380, y: 120, width: 820 },
   wikipedia: { x: 940, y: 100, width: 460 },
@@ -91,7 +93,7 @@ const titles: Record<WindowId, string> = {
   conversation: 'Conversation',
   dashboard: 'Système',
   homelab: 'Homelab',
-  vocal: 'Vocal',
+  print: 'Impression',
   goals: 'Goals',
   memory: 'Mémoire',
   wikipedia: 'Wikipédia',
@@ -112,6 +114,7 @@ const nav: NavItem[] = [
   { id: 'memory', label: 'Mémoire', icon: Database, target: 'memory' },
   { id: 'system', label: 'Système', icon: Cpu, target: 'dashboard' },
   { id: 'homelab', label: 'Homelab', icon: Server, target: 'homelab' },
+  { id: 'print', label: 'Impression', icon: Printer, target: 'print' },
   { id: 'settings', label: 'Paramètres', icon: Settings, target: null },
 ];
 
@@ -135,12 +138,17 @@ type HomelabProps = {
   onSlotSaved: () => void;
 };
 
+type PrintProps = {
+  print: PrintData | null;
+};
+
 function renderPanel(
   id: WindowId,
   orbState: OrbState,
   setOrbState: (s: OrbState) => void,
   system: SystemProps,
   homelab: HomelabProps,
+  print: PrintProps,
   wikipedia: WikipediaData,
   conversation: ConversationProps,
   instagram: WikipediaData,
@@ -152,7 +160,7 @@ function renderPanel(
   switch (id) {
     case 'dashboard': return <SystemPanel {...system} />;
     case 'homelab': return <HomelabPanel {...homelab} />;
-    case 'vocal': return <VocalPanel />;
+    case 'print': return <PrintPanel {...print} />;
     case 'goals': return <SelfModelPanel />;
     case 'memory': return <MemoryPanel />;
     case 'wikipedia': return <WikipediaPanel data={wikipedia} />;
@@ -187,6 +195,7 @@ export function NeronConsole() {
   const [systemd, setSystemd] = useState<SystemdData | null>(null);
   const [resources, setResources] = useState<SystemResources | null>(null);
   const [homelab, setHomelab] = useState<HomelabData | null>(null);
+  const [printData, setPrintData] = useState<PrintData | null>(null);
   const [wikipedia, setWikipedia] = useState<WikipediaData>(null);
   const [instagram, setInstagram] = useState<WikipediaData>(null);
   const [internet, setInternet] = useState<WikipediaData>(null);
@@ -200,7 +209,10 @@ export function NeronConsole() {
   const inactivityTimerRef = useRef<number | null>(null);
 
   const lastEvent = useNeronEvents();
-  const { messages, status, isStreaming, isThinking, isPresent, send, clear } = useNeron();
+  const {
+    messages, status, isStreaming, isThinking, isPresent, send, clear,
+    voiceState, voiceTranscript, voiceError, voiceToggle, voiceStart, voiceStop, voiceCancel,
+  } = useNeron();
 
   const visibleWindows = useMemo(
     () => openWindows.map((id) => ({ id, ...windows[id] })),
@@ -276,6 +288,11 @@ export function NeronConsole() {
         setHomelab(data);
       });
 
+      getPrintData().then((data) => {
+        if (cancelled) return;
+        setPrintData(data);
+      });
+
       getSystemdUnits()
         .then((data) => {
           if (cancelled) return;
@@ -339,7 +356,6 @@ export function NeronConsole() {
     const text = command.toLowerCase();
     if (text.includes('système') || text.includes('status') || text.includes('dashboard')) return openWindow('dashboard');
     if (text.includes('homelab') || text.includes('serveur')) return openWindow('homelab');
-    if (text.includes('vocal') || text.includes('micro')) return openWindow('vocal');
     if (text.includes('goal') || text.includes('objectif')) return openWindow('goals');
     if (text.includes('mémoire') || text.includes('memory')) return openWindow('memory');
     closeWindow('wikipedia');
@@ -458,16 +474,25 @@ export function NeronConsole() {
           onFocus={() => bringToFront(win.id)}
           onMove={(x, y) => moveWindow(win.id, x, y)}
         >
-          {renderPanel(win.id, orbState, setOrbState, { health, healthError, systemd }, { resources, homelab, onSlotSaved: () => getHomelabData().then(setHomelab) }, wikipedia, { messages, status, isStreaming, isThinking, clear }, instagram, internet, xData, facebookData, youtubeData)}
+          {renderPanel(win.id, orbState, setOrbState, { health, healthError, systemd }, { resources, homelab, onSlotSaved: () => getHomelabData().then(setHomelab) }, { print: printData }, wikipedia, { messages, status, isStreaming, isThinking, clear }, instagram, internet, xData, facebookData, youtubeData)}
         </FloatingWindow>
       ))}
 
-      <CommandBar onCommand={handleCommand} />
+      <CommandBar
+        onCommand={handleCommand}
+        voiceState={voiceState}
+        voiceTranscript={voiceTranscript}
+        voiceError={voiceError}
+        voiceToggle={voiceToggle}
+        voiceStart={voiceStart}
+        voiceStop={voiceStop}
+        voiceCancel={voiceCancel}
+      />
 {/*
       <div className="dock">
         <button title="Conversation" onClick={() => openWindow('conversation')}><MessageSquare size={19} /></button>
         <button title="Goals" onClick={() => openWindow('goals')}><Target size={19} /></button>
-        <button title="Agents" onClick={() => openWindow('vocal')}><Bot size={19} /></button>
+        <button title="Agents" disabled><Bot size={19} /></button>
         <button className="dock-orb" title="Accueil" onClick={() => setOpenWindows([])} />
         <button title="Mémoire" onClick={() => openWindow('memory')}><Database size={19} /></button>
         <button title="Homelab" onClick={() => openWindow('homelab')}><Server size={19} /></button>

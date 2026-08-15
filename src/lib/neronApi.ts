@@ -185,6 +185,43 @@ export async function getHomelabData(): Promise<HomelabData> {
   }
 }
 
+export type InkLevel = {
+  color: string;
+  percent: number;
+};
+
+export type PrinterEntry = {
+  name: string;
+  reachable: boolean;
+  state?: string;
+  state_reasons?: string[];
+  accepting_jobs?: boolean;
+  queued_jobs?: number;
+  supplies?: {
+    printer: string;
+    supported: boolean;
+    levels: InkLevel[];
+  };
+};
+
+export type PrintData = {
+  printers: PrinterEntry[];
+};
+
+export async function getPrintData(): Promise<PrintData> {
+  const empty: PrintData = { printers: [] };
+  try {
+    const headers = new Headers();
+    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
+    const response = await fetch(`${API_URL}/self-model`, { headers });
+    if (!response.ok) return empty;
+    const data = await response.json();
+    return data?.print ?? empty;
+  } catch {
+    return empty;
+  }
+}
+
 export async function setHomelabSlot(unitId: string, catalogId: string | null): Promise<boolean> {
   try {
     const headers = new Headers({ 'Content-Type': 'application/json' });
