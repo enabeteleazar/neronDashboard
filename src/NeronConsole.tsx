@@ -11,6 +11,7 @@ export type OrbState = 'idle' | 'thinking' | 'working' | 'alert';
 import { ConversationPanel } from './features/conversation';
 import { HomelabPanel } from './features/homelab';
 import { PrintPanel } from './features/print';
+import { AgentsPanel } from './features/agents';
 import { MemoryPanel } from './features/memory';
 import { SelfModelPanel } from './features/selfmodel';
 import { SystemPanel } from './features/system';
@@ -21,16 +22,18 @@ import {
   getHealth,
   getHomelabData,
   getPrintData,
+  getAgents,
   getSystemdUnits,
   getSystemResources,
   type HomelabData,
   type PrintData,
+  type AgentsData,
   type NeronHealth,
   type SystemdData,
   type SystemResources,
 } from './lib/neronApi';
 
-type WindowId = 'conversation' | 'dashboard' | 'homelab' | 'print' | 'goals' | 'memory' | 'wikipedia' | 'instagram' | 'internet' | 'x' | 'facebook' | 'youtube';
+type WindowId = 'conversation' | 'dashboard' | 'homelab' | 'print' | 'agents' | 'goals' | 'memory' | 'wikipedia' | 'instagram' | 'internet' | 'x' | 'facebook' | 'youtube';
 
 type WindowRuntimeState = {
   x: number;
@@ -56,6 +59,7 @@ const rawLayout: Record<WindowId, Box> = {
   dashboard: { x: 980, y: 110, width: 470 },
   homelab: { x: 260, y: 585, width: 430 },
   print: { x: 260, y: 585, width: 430 },
+  agents: { x: 260, y: 585, width: 430 },
   goals: { x: 760, y: 560, width: 370 },
   memory: { x: 380, y: 120, width: 820 },
   wikipedia: { x: 940, y: 100, width: 460 },
@@ -94,6 +98,7 @@ const titles: Record<WindowId, string> = {
   dashboard: 'Système',
   homelab: 'Homelab',
   print: 'Impression',
+  agents: 'Agents',
   goals: 'Goals',
   memory: 'Mémoire',
   wikipedia: 'Wikipédia',
@@ -110,7 +115,7 @@ const nav: NavItem[] = [
   { id: 'home', label: 'Accueil', icon: Home, target: null },
   { id: 'conversation', label: 'Conversation', icon: MessageSquare, target: 'conversation' },
   { id: 'goals', label: 'Goals', icon: Target, target: 'goals' },
-  { id: 'agents', label: 'Agents', icon: Users, target: null },
+  { id: 'agents', label: 'Agents', icon: Users, target: 'agents' },
   { id: 'memory', label: 'Mémoire', icon: Database, target: 'memory' },
   { id: 'system', label: 'Système', icon: Cpu, target: 'dashboard' },
   { id: 'homelab', label: 'Homelab', icon: Server, target: 'homelab' },
@@ -142,6 +147,11 @@ type PrintProps = {
   print: PrintData | null;
 };
 
+type AgentsProps = {
+  agentsData: AgentsData | null;
+  onStatusChanged: () => void;
+};
+
 function renderPanel(
   id: WindowId,
   orbState: OrbState,
@@ -149,6 +159,7 @@ function renderPanel(
   system: SystemProps,
   homelab: HomelabProps,
   print: PrintProps,
+  agents: AgentsProps,
   wikipedia: WikipediaData,
   conversation: ConversationProps,
   instagram: WikipediaData,
@@ -161,6 +172,7 @@ function renderPanel(
     case 'dashboard': return <SystemPanel {...system} />;
     case 'homelab': return <HomelabPanel {...homelab} />;
     case 'print': return <PrintPanel {...print} />;
+    case 'agents': return <AgentsPanel {...agents} />;
     case 'goals': return <SelfModelPanel />;
     case 'memory': return <MemoryPanel />;
     case 'wikipedia': return <WikipediaPanel data={wikipedia} />;
@@ -196,6 +208,7 @@ export function NeronConsole() {
   const [resources, setResources] = useState<SystemResources | null>(null);
   const [homelab, setHomelab] = useState<HomelabData | null>(null);
   const [printData, setPrintData] = useState<PrintData | null>(null);
+  const [agentsData, setAgentsData] = useState<AgentsData | null>(null);
   const [wikipedia, setWikipedia] = useState<WikipediaData>(null);
   const [instagram, setInstagram] = useState<WikipediaData>(null);
   const [internet, setInternet] = useState<WikipediaData>(null);
@@ -291,6 +304,11 @@ export function NeronConsole() {
       getPrintData().then((data) => {
         if (cancelled) return;
         setPrintData(data);
+      });
+
+      getAgents().then((data) => {
+        if (cancelled) return;
+        setAgentsData(data);
       });
 
       getSystemdUnits()
@@ -474,7 +492,7 @@ export function NeronConsole() {
           onFocus={() => bringToFront(win.id)}
           onMove={(x, y) => moveWindow(win.id, x, y)}
         >
-          {renderPanel(win.id, orbState, setOrbState, { health, healthError, systemd }, { resources, homelab, onSlotSaved: () => getHomelabData().then(setHomelab) }, { print: printData }, wikipedia, { messages, status, isStreaming, isThinking, clear }, instagram, internet, xData, facebookData, youtubeData)}
+          {renderPanel(win.id, orbState, setOrbState, { health, healthError, systemd }, { resources, homelab, onSlotSaved: () => getHomelabData().then(setHomelab) }, { print: printData }, { agentsData, onStatusChanged: () => getAgents().then(setAgentsData) }, wikipedia, { messages, status, isStreaming, isThinking, clear }, instagram, internet, xData, facebookData, youtubeData)}
         </FloatingWindow>
       ))}
 

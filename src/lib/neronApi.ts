@@ -222,6 +222,53 @@ export async function getPrintData(): Promise<PrintData> {
   }
 }
 
+export type AgentEntry = {
+  agent_id: string;
+  status: 'available' | 'unavailable' | 'unknown';
+  description: string;
+};
+
+export type AgentsData = {
+  agents: AgentEntry[];
+};
+
+export async function getAgents(): Promise<AgentsData> {
+  const empty: AgentsData = { agents: [] };
+  try {
+    const headers = new Headers();
+    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
+    const response = await fetch(`${API_URL}/self-model/agents`, { headers });
+    if (!response.ok) return empty;
+    const data = await response.json();
+    const raw = Array.isArray(data?.agents) ? data.agents : [];
+    const agents: AgentEntry[] = raw
+      .filter((item: unknown) => item && typeof item === 'object' && 'agent_id' in item)
+      .map((item: { agent_id: string; status?: string; description?: string }) => ({
+        agent_id: item.agent_id,
+        status: (item.status as AgentEntry['status']) || 'unknown',
+        description: item.description || '',
+      }));
+    return { agents };
+  } catch {
+    return empty;
+  }
+}
+
+export async function setAgentStatus(agentId: string, enabled: boolean): Promise<boolean> {
+  try {
+    const headers = new Headers({ 'Content-Type': 'application/json' });
+    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
+    const response = await fetch(`${API_URL}/self-model/agents/${agentId}/status`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ enabled }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function setHomelabSlot(unitId: string, catalogId: string | null): Promise<boolean> {
   try {
     const headers = new Headers({ 'Content-Type': 'application/json' });
