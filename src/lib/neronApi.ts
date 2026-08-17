@@ -222,6 +222,33 @@ export async function getPrintData(): Promise<PrintData> {
   }
 }
 
+export type DoctorProbe = {
+  code: number | null;
+  ok: boolean;
+  latency_ms: number | null;
+  error: string | null;
+};
+
+export type DoctorData = {
+  reachable: boolean;
+  probes: Record<string, DoctorProbe>;
+  all_ok?: boolean;
+};
+
+export async function getDoctorData(): Promise<DoctorData> {
+  const empty: DoctorData = { reachable: false, probes: {} };
+  try {
+    const headers = new Headers();
+    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
+    const response = await fetch(`${API_URL}/self-model`, { headers });
+    if (!response.ok) return empty;
+    const data = await response.json();
+    return data?.doctor ?? empty;
+  } catch {
+    return empty;
+  }
+}
+
 export type AgentEntry = {
   agent_id: string;
   status: 'available' | 'unavailable' | 'unknown';

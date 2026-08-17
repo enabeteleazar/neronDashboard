@@ -1,4 +1,4 @@
-import { Activity, Bell, Bot, Cpu, Database, Home, MessageSquare, Mic, Printer, Server, Settings, Sun, Target, Terminal, Users } from 'lucide-react';
+import { Activity, Bell, Bot, Cpu, Database, Home, MessageSquare, Mic, Printer, Server, Settings, Stethoscope, Sun, Target, Terminal, Users } from 'lucide-react';
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { CommandBar } from './components/CommandBar';
 import { FloatingWindow } from './components/FloatingWindow';
@@ -11,6 +11,7 @@ export type OrbState = 'idle' | 'thinking' | 'working' | 'alert';
 import { ConversationPanel } from './features/conversation';
 import { HomelabPanel } from './features/homelab';
 import { PrintPanel } from './features/print';
+import { DoctorPanel } from './features/doctor';
 import { AgentsPanel } from './features/agents';
 import { MemoryPanel } from './features/memory';
 import { SelfModelPanel } from './features/selfmodel';
@@ -22,18 +23,20 @@ import {
   getHealth,
   getHomelabData,
   getPrintData,
+  getDoctorData,
   getAgents,
   getSystemdUnits,
   getSystemResources,
   type HomelabData,
   type PrintData,
+  type DoctorData,
   type AgentsData,
   type NeronHealth,
   type SystemdData,
   type SystemResources,
 } from './lib/neronApi';
 
-type WindowId = 'conversation' | 'dashboard' | 'homelab' | 'print' | 'agents' | 'goals' | 'memory' | 'wikipedia' | 'instagram' | 'internet' | 'x' | 'facebook' | 'youtube';
+type WindowId = 'conversation' | 'dashboard' | 'homelab' | 'print' | 'doctor' | 'agents' | 'goals' | 'memory' | 'wikipedia' | 'instagram' | 'internet' | 'x' | 'facebook' | 'youtube';
 
 type WindowRuntimeState = {
   x: number;
@@ -59,6 +62,7 @@ const rawLayout: Record<WindowId, Box> = {
   dashboard: { x: 980, y: 110, width: 470 },
   homelab: { x: 260, y: 585, width: 430 },
   print: { x: 260, y: 585, width: 430 },
+  doctor: { x: 260, y: 585, width: 430 },
   agents: { x: 260, y: 585, width: 430 },
   goals: { x: 760, y: 560, width: 370 },
   memory: { x: 380, y: 120, width: 820 },
@@ -98,6 +102,7 @@ const titles: Record<WindowId, string> = {
   dashboard: 'Système',
   homelab: 'Homelab',
   print: 'Impression',
+  doctor: 'Doctor',
   agents: 'Agents',
   goals: 'Goals',
   memory: 'Mémoire',
@@ -120,6 +125,7 @@ const nav: NavItem[] = [
   { id: 'system', label: 'Système', icon: Cpu, target: 'dashboard' },
   { id: 'homelab', label: 'Homelab', icon: Server, target: 'homelab' },
   { id: 'print', label: 'Impression', icon: Printer, target: 'print' },
+  { id: 'doctor', label: 'Doctor', icon: Stethoscope, target: 'doctor' },
   { id: 'settings', label: 'Paramètres', icon: Settings, target: null },
 ];
 
@@ -147,6 +153,10 @@ type PrintProps = {
   print: PrintData | null;
 };
 
+type DoctorProps = {
+  doctor: DoctorData | null;
+};
+
 type AgentsProps = {
   agentsData: AgentsData | null;
   onStatusChanged: () => void;
@@ -159,6 +169,7 @@ function renderPanel(
   system: SystemProps,
   homelab: HomelabProps,
   print: PrintProps,
+  doctor: DoctorProps,
   agents: AgentsProps,
   wikipedia: WikipediaData,
   conversation: ConversationProps,
@@ -172,6 +183,7 @@ function renderPanel(
     case 'dashboard': return <SystemPanel {...system} />;
     case 'homelab': return <HomelabPanel {...homelab} />;
     case 'print': return <PrintPanel {...print} />;
+    case 'doctor': return <DoctorPanel {...doctor} />;
     case 'agents': return <AgentsPanel {...agents} />;
     case 'goals': return <SelfModelPanel />;
     case 'memory': return <MemoryPanel />;
@@ -208,6 +220,7 @@ export function NeronConsole() {
   const [resources, setResources] = useState<SystemResources | null>(null);
   const [homelab, setHomelab] = useState<HomelabData | null>(null);
   const [printData, setPrintData] = useState<PrintData | null>(null);
+  const [doctorData, setDoctorData] = useState<DoctorData | null>(null);
   const [agentsData, setAgentsData] = useState<AgentsData | null>(null);
   const [wikipedia, setWikipedia] = useState<WikipediaData>(null);
   const [instagram, setInstagram] = useState<WikipediaData>(null);
@@ -304,6 +317,11 @@ export function NeronConsole() {
       getPrintData().then((data) => {
         if (cancelled) return;
         setPrintData(data);
+      });
+
+      getDoctorData().then((data) => {
+        if (cancelled) return;
+        setDoctorData(data);
       });
 
       getAgents().then((data) => {
@@ -492,7 +510,7 @@ export function NeronConsole() {
           onFocus={() => bringToFront(win.id)}
           onMove={(x, y) => moveWindow(win.id, x, y)}
         >
-          {renderPanel(win.id, orbState, setOrbState, { health, healthError, systemd }, { resources, homelab, onSlotSaved: () => getHomelabData().then(setHomelab) }, { print: printData }, { agentsData, onStatusChanged: () => getAgents().then(setAgentsData) }, wikipedia, { messages, status, isStreaming, isThinking, clear }, instagram, internet, xData, facebookData, youtubeData)}
+          {renderPanel(win.id, orbState, setOrbState, { health, healthError, systemd }, { resources, homelab, onSlotSaved: () => getHomelabData().then(setHomelab) }, { print: printData }, { doctor: doctorData }, { agentsData, onStatusChanged: () => getAgents().then(setAgentsData) }, wikipedia, { messages, status, isStreaming, isThinking, clear }, instagram, internet, xData, facebookData, youtubeData)}
         </FloatingWindow>
       ))}
 
