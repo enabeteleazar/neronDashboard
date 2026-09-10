@@ -22,11 +22,13 @@ import { useNeron } from './hooks/useNeron';
 import {
   getHealth,
   getHomelabData,
-  getPrintData,
-  getDoctorData,
+  getSelfModel,
   getAgents,
-  getSystemdUnits,
-  getSystemResources,
+  resourcesFromSelfModel,
+  homelabFromSelfModel,
+  printFromSelfModel,
+  doctorFromSelfModel,
+  systemdFromSelfModel,
   type HomelabData,
   type PrintData,
   type DoctorData,
@@ -45,13 +47,6 @@ type WindowRuntimeState = {
   minimized: boolean;
   pinned: boolean;
   z: number;
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  connecting: 'Connexion…',
-  connected: 'Connecté',
-  disconnected: 'Déconnecté — reconnexion…',
-  error: 'Erreur de connexion',
 };
 
 type Box = Omit<WindowRuntimeState, 'z' | 'minimized' | 'pinned'>;
@@ -76,19 +71,28 @@ const rawLayout: Record<WindowId, Box> = {
 
 /* Ramene la mise en page dans le viewport reel : sans ca, les fenetres
    posees a x:1420 s'ouvrent hors champ sur un ecran de 1280. */
-const SIDEBAR_W = 220;
 const GAP = 16;
 const TOP = 96;
+
+/* Doit suivre les largeurs de .sidebar definies par les @media de global.css,
+   sinon x/width sont calcules pour une sidebar plus large que celle reellement
+   affichee et les fenetres se positionnent hors du viewport sur mobile. */
+function sidebarWidthFor(vw: number): number {
+  if (vw <= 640) return 60;
+  if (vw <= 1100) return 186;
+  return 220;
+}
 
 function clampLayout(src: Record<WindowId, Box>): Record<WindowId, Box> {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
+  const sidebarW = sidebarWidthFor(vw);
   const out = {} as Record<WindowId, Box>;
   (Object.keys(src) as WindowId[]).forEach((id) => {
     const b = src[id];
-    const width = Math.max(280, Math.min(b.width, vw - SIDEBAR_W - GAP * 2));
-    const maxX = Math.max(SIDEBAR_W + GAP, vw - width - GAP);
-    const x = Math.min(Math.max(b.x, SIDEBAR_W + GAP), maxX);
+    const width = Math.max(200, Math.min(b.width, vw - sidebarW - GAP * 2));
+    const maxX = Math.max(sidebarW + GAP, vw - width - GAP);
+    const x = Math.min(Math.max(b.x, sidebarW + GAP), maxX);
     const y = Math.min(Math.max(b.y, TOP), Math.max(TOP, vh - 220));
     out[id] = { ...b, x, y, width };
   });
@@ -301,38 +305,25 @@ export function NeronConsole() {
         .then((data) => { if (!cancelled) { setHealth(data); setHealthError(false); } })
         .catch(() => { if (!cancelled) setHealthError(true); });
 
-      getSystemResources().then((data) => {
-        if (cancelled) return;
-        setResources(data);
-        const isAlert = [data.cpu_pct, data.ram_pct, data.disk_pct].some((v) => v != null && v >= 90);
-        if (isAlert && !wasResourceAlert.current) openWindowRef.current('homelab');
-        wasResourceAlert.current = isAlert;
-      });
-
-      getHomelabData().then((data) => {
-        if (cancelled) return;
-        setHomelab(data);
-      });
-
-      getPrintData().then((data) => {
-        if (cancelled) return;
-        setPrintData(data);
-      });
-
-      getDoctorData().then((data) => {
-        if (cancelled) return;
-        setDoctorData(data);
-      });
-
-      getAgents().then((data) => {
-        if (cancelled) return;
-        setAgentsData(data);
-      });
-
-      getSystemdUnits()
-        .then((data) => {
+      // Une seule lecture de /self-model par cycle : resources, homelab, print,
+      // doctor et systemd en derivent tous (5 requetes identiques auparavant).
+      getSelfModel()
+        .then((selfModel) => {
           if (cancelled) return;
-          const units = data?.units ?? [];
+
+          const resourcesData = resourcesFromSelfModel(selfModel);
+          setResources(resourcesData);
+          const isAlert = [resourcesData.cpu_pct, resourcesData.ram_pct, resourcesData.disk_pct]
+            .some((v) => v != null && v >= 90);
+          if (isAlert && !wasResourceAlert.current) openWindowRef.current('homelab');
+          wasResourceAlert.current = isAlert;
+
+          setHomelab(homelabFromSelfModel(selfModel));
+          setPrintData(printFromSelfModel(selfModel));
+          setDoctorData(doctorFromSelfModel(selfModel));
+
+          const systemdData = systemdFromSelfModel(selfModel);
+          const units = systemdData.units ?? [];
           const nextStatuses: Record<string, string> = {};
           let changed = false;
           for (const unit of units) {
@@ -343,10 +334,15 @@ export function NeronConsole() {
             if (prev !== undefined && prev !== unit.active_state && bad) changed = true;
           }
           prevStatuses.current = nextStatuses;
-          setSystemd(data);
+          setSystemd(systemdData);
           if (changed) openWindowRef.current('dashboard');
         })
         .catch(() => { if (!cancelled) setSystemd(null); });
+
+      getAgents().then((data) => {
+        if (cancelled) return;
+        setAgentsData(data);
+      });
     }
 
     poll();

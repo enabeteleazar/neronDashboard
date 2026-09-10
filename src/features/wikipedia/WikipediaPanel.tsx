@@ -49,7 +49,12 @@ export function WikipediaPanel({ data }: WikipediaProps) {
           src={data.url}
           title={data.title ?? 'Wikipédia'}
           style={{ flex: 1, border: 'none', width: '100%', minHeight: 400 }}
-          sandbox="allow-same-origin allow-scripts allow-popups"
+          // Ni allow-same-origin ni allow-top-navigation : l'URL vient du backend
+          // (memory.wikipedia_fallback) et n'est pas necessairement Wikipedia
+          // (source "web"). allow-scripts + allow-same-origin combines est
+          // l'anti-pattern classique qui permet a la frame de s'affranchir de
+          // son propre sandbox.
+          sandbox="allow-scripts allow-popups"
         />
       )}
     </div>

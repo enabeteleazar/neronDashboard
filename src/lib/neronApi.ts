@@ -118,23 +118,58 @@ function extractGauge(text: string, name: string): number | null {
   return match ? Number(match[1]) : null;
 }
 
-export async function getSystemResources(): Promise<SystemResources> {
-  const empty: SystemResources = { cpu_pct: null, ram_pct: null, disk_pct: null };
+// Les 5 fonctions get*() ci-dessous lisaient chacune /self-model separement :
+// avec le polling 2s de NeronConsole, ca faisait 5 requetes identiques par
+// cycle. getSelfModel() + les extract*() partagent maintenant une seule
+// lecture ; les get*() restent disponibles pour les rafraichissements
+// ponctuels (ex. onSlotSaved) ou une seule section est concernee.
+export type SelfModelData = {
+  runtime?: { cpu_usage?: number; ram_usage?: number; disk_usage?: number };
+  homelab?: HomelabData;
+  print?: PrintData;
+  doctor?: DoctorData;
+  systemd?: SystemdData;
+};
+
+export async function getSelfModel(): Promise<SelfModelData | null> {
   try {
     const headers = new Headers();
     if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
     const response = await fetch(`${API_URL}/self-model`, { headers });
-    if (!response.ok) return empty;
-    const data = await response.json();
-    const runtime = data?.runtime ?? {};
-    return {
-      cpu_pct: runtime.cpu_usage ?? null,
-      ram_pct: runtime.ram_usage ?? null,
-      disk_pct: runtime.disk_usage ?? null,
-    };
+    if (!response.ok) return null;
+    return await response.json();
   } catch {
-    return empty;
+    return null;
   }
+}
+
+export function resourcesFromSelfModel(data: SelfModelData | null): SystemResources {
+  const runtime = data?.runtime ?? {};
+  return {
+    cpu_pct: runtime.cpu_usage ?? null,
+    ram_pct: runtime.ram_usage ?? null,
+    disk_pct: runtime.disk_usage ?? null,
+  };
+}
+
+export function homelabFromSelfModel(data: SelfModelData | null): HomelabData {
+  return data?.homelab ?? { catalog: [], slots: {}, racks: [] };
+}
+
+export function printFromSelfModel(data: SelfModelData | null): PrintData {
+  return data?.print ?? { printers: [] };
+}
+
+export function doctorFromSelfModel(data: SelfModelData | null): DoctorData {
+  return data?.doctor ?? { reachable: false, probes: {} };
+}
+
+export function systemdFromSelfModel(data: SelfModelData | null): SystemdData {
+  return data?.systemd ?? { available: false, units: [] };
+}
+
+export async function getSystemResources(): Promise<SystemResources> {
+  return resourcesFromSelfModel(await getSelfModel());
 }
 
 export async function getServices() {
@@ -172,17 +207,7 @@ export type HomelabData = {
 };
 
 export async function getHomelabData(): Promise<HomelabData> {
-  const empty: HomelabData = { catalog: [], slots: {}, racks: [] };
-  try {
-    const headers = new Headers();
-    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
-    const response = await fetch(`${API_URL}/self-model`, { headers });
-    if (!response.ok) return empty;
-    const data = await response.json();
-    return data?.homelab ?? empty;
-  } catch {
-    return empty;
-  }
+  return homelabFromSelfModel(await getSelfModel());
 }
 
 export type InkLevel = {
@@ -209,17 +234,7 @@ export type PrintData = {
 };
 
 export async function getPrintData(): Promise<PrintData> {
-  const empty: PrintData = { printers: [] };
-  try {
-    const headers = new Headers();
-    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
-    const response = await fetch(`${API_URL}/self-model`, { headers });
-    if (!response.ok) return empty;
-    const data = await response.json();
-    return data?.print ?? empty;
-  } catch {
-    return empty;
-  }
+  return printFromSelfModel(await getSelfModel());
 }
 
 export type DoctorProbe = {
@@ -236,17 +251,7 @@ export type DoctorData = {
 };
 
 export async function getDoctorData(): Promise<DoctorData> {
-  const empty: DoctorData = { reachable: false, probes: {} };
-  try {
-    const headers = new Headers();
-    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
-    const response = await fetch(`${API_URL}/self-model`, { headers });
-    if (!response.ok) return empty;
-    const data = await response.json();
-    return data?.doctor ?? empty;
-  } catch {
-    return empty;
-  }
+  return doctorFromSelfModel(await getSelfModel());
 }
 
 export type AgentEntry = {
@@ -370,15 +375,5 @@ export type SystemdData = {
 };
 
 export async function getSystemdUnits(): Promise<SystemdData> {
-  const empty: SystemdData = { available: false, units: [] };
-  try {
-    const headers = new Headers();
-    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
-    const response = await fetch(`${API_URL}/self-model`, { headers });
-    if (!response.ok) return empty;
-    const data = await response.json();
-    return data?.systemd ?? empty;
-  } catch {
-    return empty;
-  }
+  return systemdFromSelfModel(await getSelfModel());
 }

@@ -32,7 +32,13 @@ export default defineConfig({
   // Le Dashboard est servi sous /dashboard/ par Caddy : les assets doivent
   // etre emis avec ce prefixe, sinon 404 sur tout le bundle.
   base: '/dashboard/',
-  plugins: [react(), visualizer({ filename: 'dist/stats.html', gzipSize: true, brotliSize: true })],
+  // visualizer genere dist/stats.html : utile en analyse ponctuelle (ANALYZE=1),
+  // mais couteux (plusieurs secondes) si execute a chaque build de prod — il a
+  // contribue a un depassement du timeout de demarrage systemd (start-pre).
+  plugins: [
+    react(),
+    ...(process.env.ANALYZE ? [visualizer({ filename: 'dist/stats.html', gzipSize: true, brotliSize: true })] : []),
+  ],
   define: {
     'import.meta.env.VITE_NERON_API_KEY': JSON.stringify(apiKey),
     'import.meta.env.VITE_NERON_TOKEN': JSON.stringify(apiKey),

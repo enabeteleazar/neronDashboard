@@ -180,13 +180,6 @@ nav button:hover { background: rgba(255,255,255,.07); color: white; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.035); } }
 
-@media (max-width: 1100px) {
-  .sidebar { width: 180px; }
-  .topbar { left: 180px; }
-  .orb-zone { padding-left: 180px; }
-  .floating-window { transform: scale(.82); transform-origin: top left; }
-}
-
 .service-list b.status-healthy { color: #4ade80; }
 .service-list b.status-degraded { color: #facc15; }
 .service-list b.status-unhealthy { color: #f87171; }
@@ -335,11 +328,40 @@ nav button:hover { background: rgba(255,255,255,.07); color: white; }
   gap: 7px; font-size: 12px; color: #7f8aa8; }
 .status-left.ko { color: #ff8f8f; }
 .connection-state { font-size: 12px; bottom: 24px; }
+/* Tablette (768-1100px) : sidebar reduite, fenetres legerement reduites. */
 @media (max-width: 1100px) {
   .sidebar { width: 186px; }
   .topbar { left: 186px; }
   .orb-zone { padding-left: 186px; }
   .status-left { left: 210px; }
+  .floating-window { transform: scale(.9); transform-origin: top left; }
+}
+
+@media (max-width: 768px) {
+  .command-bar { width: min(560px, 90vw); }
+  .floating-window { transform: scale(.85); transform-origin: top left; }
+}
+
+/* Mobile (<=640px) : sidebar repliee en rail d'icones (texte masque via
+   font-size:0, les icones lucide gardent leur taille en px explicite). */
+@media (max-width: 640px) {
+  .sidebar { width: 60px; padding: 16px 8px; gap: 10px; }
+  .topbar { left: 60px; height: 64px; }
+  .orb-zone { padding-left: 60px; }
+  .status-left { left: 76px; }
+
+  .brand { justify-content: center; }
+  .brand > div:not(.brand-orb) { display: none; }
+  .nav-item { justify-content: center; font-size: 0; padding: 10px 6px; }
+  .sidebar-metrics, .sidebar-agent, .sidebar-footer { display: none; }
+  .face-slot { display: none; }
+
+  .wordmark { font-size: 16px; letter-spacing: 8px; text-indent: 8px; }
+  .version { display: none; }
+
+  .command-bar { width: min(560px, 92vw); bottom: 88px; height: 58px; padding: 0 12px; gap: 10px; }
+  .floating-window { transform: scale(.78); transform-origin: top left; }
+  .floating-window .window-body { padding: 12px; }
 }
 
 .rack-occupants { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }

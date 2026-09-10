@@ -63,7 +63,10 @@ export function FloatingWindow({
       className={`floating-window${minimized ? ' minimized' : ''}`}
       style={{ left: x, top: y, width, zIndex,
         resize: 'both', overflow: 'auto',
-        minWidth: 320, maxWidth: '95vw', maxHeight: '85vh' }}
+        // min() plutot qu'un plancher fixe : un plancher de 320px garantissait
+        // un debordement sur les viewports mobiles (320-430px) une fois la
+        // sidebar deduite.
+        minWidth: 'min(320px, 90vw)', maxWidth: '95vw', maxHeight: '85vh' }}
       onPointerDown={onFocus}
     >
       <header

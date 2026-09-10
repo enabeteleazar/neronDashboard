@@ -2,13 +2,6 @@ import { useEffect, useRef } from 'react';
 import type { ChatMessage, ConnectionStatus } from '../../lib/neronApi';
 import type { OrbState } from '../../NeronConsole';
 
-const STATUS_LABEL: Record<string, string> = {
-  connecting: 'Connexion…',
-  connected: 'Connecté',
-  disconnected: 'Déconnecté — reconnexion…',
-  error: 'Erreur de connexion',
-};
-
 type ConversationProps = {
   setOrbState: (s: OrbState) => void;
   messages: ChatMessage[];
