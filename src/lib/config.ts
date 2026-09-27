@@ -13,6 +13,8 @@ export const MEMORY_URL = '/memoire';
 // un acces direct sur :4400 ne fonctionnera pas.
 export const WS_URL = 'wss://' + window.location.host + '/ws/';
 
+// La cle Core (NERON_API_KEY) n'est plus livree au navigateur : Caddy
+// l'injecte cote serveur sur le reverse proxy /api/*. Voir
+// system/deploy/caddy/Caddyfile.
 // Repli vide et non 'changez_moi' : une absence de cle doit echouer franchement.
-export const API_KEY = import.meta.env.VITE_NERON_API_KEY ?? '';
 export const TOKEN = import.meta.env.VITE_NERON_TOKEN ?? '';

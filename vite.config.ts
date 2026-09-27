@@ -23,9 +23,13 @@ function readSecret(name: string): string {
   return '';
 }
 
-const apiKey = readSecret('NERON_API_KEY');
-if (!apiKey) {
-  console.warn('[neron] ATTENTION : NERON_API_KEY introuvable, le bundle partira sans cle');
+// Utilisee uniquement pour le handshake WS (gateway.auth). L'authentification
+// REST vers le Core (Authorization: Bearer) est injectee cote Caddy sur le
+// reverse proxy /api/* — cette cle ne doit JAMAIS finir dans le bundle pour
+// cet usage (voir system/deploy/caddy/Caddyfile).
+const gatewayToken = readSecret('NERON_API_KEY');
+if (!gatewayToken) {
+  console.warn('[neron] ATTENTION : NERON_API_KEY introuvable, le WS gateway.auth echouera');
 }
 
 export default defineConfig({
@@ -40,8 +44,7 @@ export default defineConfig({
     ...(process.env.ANALYZE ? [visualizer({ filename: 'dist/stats.html', gzipSize: true, brotliSize: true })] : []),
   ],
   define: {
-    'import.meta.env.VITE_NERON_API_KEY': JSON.stringify(apiKey),
-    'import.meta.env.VITE_NERON_TOKEN': JSON.stringify(apiKey),
+    'import.meta.env.VITE_NERON_TOKEN': JSON.stringify(gatewayToken),
   },
   server: {
     port: 8080,

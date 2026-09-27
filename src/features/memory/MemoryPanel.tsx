@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { API_KEY, MEMORY_URL } from '../../lib/config';
+import { MEMORY_URL } from '../../lib/config';
 
 // Le carnet est ce que Neron tient pour vrai, le brouillon ce qu il
 // soupconne. Une fiche passe de l un a l autre a partir de SEUIL points :
@@ -22,12 +22,13 @@ type Etat = {
   passes_total: number; derniere_passe: string | null;
 };
 
+// Authentification vers le service memoire injectee cote Caddy sur
+// /memoire/*, jamais ici (voir system/deploy/caddy/Caddyfile).
 async function api(chemin: string, init?: RequestInit) {
   const r = await fetch(`${MEMORY_URL}${chemin}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${API_KEY}`,
       ...(init?.headers ?? {}),
     },
   });

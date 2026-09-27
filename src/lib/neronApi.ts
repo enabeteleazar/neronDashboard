@@ -1,16 +1,16 @@
-import { API_URL, API_KEY, STT_URL } from './config';
+import { API_URL, STT_URL } from './config';
 
-type ApiOptions = RequestInit & { auth?: boolean; timeoutMs?: number };
+type ApiOptions = RequestInit & { timeoutMs?: number };
 
+// L'authentification vers le Core (Authorization: Bearer <cle>) est injectee
+// cote Caddy sur le reverse proxy /api/*, jamais ici : la cle ne doit pas
+// vivre dans le bundle livre au navigateur.
 export async function neronFetch<T>(path: string, options: ApiOptions = {}, baseUrl: string = API_URL): Promise<T> {
-  const { timeoutMs = 15000, auth, ...init } = options;
+  const { timeoutMs = 15000, ...init } = options;
   const headers = new Headers(init.headers);
 
   if (!(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
-  }
-  if (auth !== false && API_KEY) {
-    headers.set('Authorization', `Bearer ${API_KEY}`);
   }
 
   const controller = new AbortController();
@@ -90,7 +90,7 @@ export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'er
 /* ------------------------------------------------------------------ */
 
 export async function getHealth() {
-  return neronFetch<NeronHealth>('/health', { auth: false, timeoutMs: 5000 });
+  return neronFetch<NeronHealth>('/health', { timeoutMs: 5000 });
 }
 
 export async function getStatus() {
@@ -133,9 +133,7 @@ export type SelfModelData = {
 
 export async function getSelfModel(): Promise<SelfModelData | null> {
   try {
-    const headers = new Headers();
-    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
-    const response = await fetch(`${API_URL}/self-model`, { headers });
+    const response = await fetch(`${API_URL}/self-model`);
     if (!response.ok) return null;
     return await response.json();
   } catch {
@@ -267,9 +265,7 @@ export type AgentsData = {
 export async function getAgents(): Promise<AgentsData> {
   const empty: AgentsData = { agents: [] };
   try {
-    const headers = new Headers();
-    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
-    const response = await fetch(`${API_URL}/self-model/agents`, { headers });
+    const response = await fetch(`${API_URL}/self-model/agents`);
     if (!response.ok) return empty;
     const data = await response.json();
     const raw = Array.isArray(data?.agents) ? data.agents : [];
@@ -289,7 +285,6 @@ export async function getAgents(): Promise<AgentsData> {
 export async function setAgentStatus(agentId: string, enabled: boolean): Promise<boolean> {
   try {
     const headers = new Headers({ 'Content-Type': 'application/json' });
-    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
     const response = await fetch(`${API_URL}/self-model/agents/${agentId}/status`, {
       method: 'POST',
       headers,
@@ -304,7 +299,6 @@ export async function setAgentStatus(agentId: string, enabled: boolean): Promise
 export async function setHomelabSlot(unitId: string, catalogId: string | null): Promise<boolean> {
   try {
     const headers = new Headers({ 'Content-Type': 'application/json' });
-    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
     const response = await fetch(`${API_URL}/self-model/homelab/slots/${unitId}`, {
       method: 'POST',
       headers,
@@ -345,7 +339,7 @@ export async function sendAudio(blob: Blob) {
 export async function transcribeAudio(blob: Blob) {
   return neronFetch<{ text?: string; error?: string }>(
     '/transcribe',
-    { method: 'POST', headers: { 'content-type': blob.type }, body: blob, timeoutMs: 30000, auth: false },
+    { method: 'POST', headers: { 'content-type': blob.type }, body: blob, timeoutMs: 30000 },
     STT_URL,
   );
 }
