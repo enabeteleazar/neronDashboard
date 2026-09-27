@@ -1,18 +1,16 @@
-const API_URL = import.meta.env.VITE_NERON_API_URL ?? 'http://localhost:8010';
-const API_KEY = import.meta.env.VITE_NERON_API_KEY ?? '';
-const STT_URL = import.meta.env.VITE_NERON_STT_URL ?? 'http://localhost:8001';
+import { API_URL, STT_URL } from './config';
 
-type ApiOptions = RequestInit & { auth?: boolean; timeoutMs?: number };
+type ApiOptions = RequestInit & { timeoutMs?: number };
 
+// L'authentification vers le Core (Authorization: Bearer <cle>) est injectee
+// cote Caddy sur le reverse proxy /api/*, jamais ici : la cle ne doit pas
+// vivre dans le bundle livre au navigateur.
 export async function neronFetch<T>(path: string, options: ApiOptions = {}, baseUrl: string = API_URL): Promise<T> {
-  const { timeoutMs = 15000, auth, ...init } = options;
+  const { timeoutMs = 15000, ...init } = options;
   const headers = new Headers(init.headers);
 
   if (!(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
-  }
-  if (auth !== false && API_KEY) {
-    headers.set('Authorization', `Bearer ${API_KEY}`);
   }
 
   const controller = new AbortController();
@@ -92,7 +90,7 @@ export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'er
 /* ------------------------------------------------------------------ */
 
 export async function getHealth() {
-  return neronFetch<NeronHealth>('/health', { auth: false, timeoutMs: 5000 });
+  return neronFetch<NeronHealth>('/health', { timeoutMs: 5000 });
 }
 
 export async function getStatus() {
@@ -120,23 +118,56 @@ function extractGauge(text: string, name: string): number | null {
   return match ? Number(match[1]) : null;
 }
 
-export async function getSystemResources(): Promise<SystemResources> {
-  const empty: SystemResources = { cpu_pct: null, ram_pct: null, disk_pct: null };
+// Les 5 fonctions get*() ci-dessous lisaient chacune /self-model separement :
+// avec le polling 2s de NeronConsole, ca faisait 5 requetes identiques par
+// cycle. getSelfModel() + les extract*() partagent maintenant une seule
+// lecture ; les get*() restent disponibles pour les rafraichissements
+// ponctuels (ex. onSlotSaved) ou une seule section est concernee.
+export type SelfModelData = {
+  runtime?: { cpu_usage?: number; ram_usage?: number; disk_usage?: number };
+  homelab?: HomelabData;
+  print?: PrintData;
+  doctor?: DoctorData;
+  systemd?: SystemdData;
+};
+
+export async function getSelfModel(): Promise<SelfModelData | null> {
   try {
-    const headers = new Headers();
-    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
-    const response = await fetch(`${API_URL}/self-model`, { headers });
-    if (!response.ok) return empty;
-    const data = await response.json();
-    const runtime = data?.runtime ?? {};
-    return {
-      cpu_pct: runtime.cpu_usage ?? null,
-      ram_pct: runtime.ram_usage ?? null,
-      disk_pct: runtime.disk_usage ?? null,
-    };
+    const response = await fetch(`${API_URL}/self-model`);
+    if (!response.ok) return null;
+    return await response.json();
   } catch {
-    return empty;
+    return null;
   }
+}
+
+export function resourcesFromSelfModel(data: SelfModelData | null): SystemResources {
+  const runtime = data?.runtime ?? {};
+  return {
+    cpu_pct: runtime.cpu_usage ?? null,
+    ram_pct: runtime.ram_usage ?? null,
+    disk_pct: runtime.disk_usage ?? null,
+  };
+}
+
+export function homelabFromSelfModel(data: SelfModelData | null): HomelabData {
+  return data?.homelab ?? { catalog: [], slots: {}, racks: [] };
+}
+
+export function printFromSelfModel(data: SelfModelData | null): PrintData {
+  return data?.print ?? { printers: [] };
+}
+
+export function doctorFromSelfModel(data: SelfModelData | null): DoctorData {
+  return data?.doctor ?? { reachable: false, probes: {} };
+}
+
+export function systemdFromSelfModel(data: SelfModelData | null): SystemdData {
+  return data?.systemd ?? { available: false, units: [] };
+}
+
+export async function getSystemResources(): Promise<SystemResources> {
+  return resourcesFromSelfModel(await getSelfModel());
 }
 
 export async function getServices() {
@@ -151,29 +182,123 @@ export type HomelabCatalogItem = {
   description: string;
 };
 
+export type RackOccupant = {
+  key: string;
+  ports: number[];
+  state: 'actif' | 'injoignable' | 'inconnu';
+  foreign: boolean;
+  ram_mb?: number;
+  cpu_percent?: number;
+  uptime_seconds?: number;
+};
+
+export type Rack = {
+  unit: string;
+  host: string;
+  occupants: RackOccupant[];
+};
+
 export type HomelabData = {
   catalog: HomelabCatalogItem[];
   slots: Record<string, string>;
+  racks: Rack[];
 };
 
 export async function getHomelabData(): Promise<HomelabData> {
-  const empty: HomelabData = { catalog: [], slots: {} };
+  return homelabFromSelfModel(await getSelfModel());
+}
+
+export type InkLevel = {
+  color: string;
+  percent: number;
+};
+
+export type PrinterEntry = {
+  name: string;
+  reachable: boolean;
+  state?: string;
+  state_reasons?: string[];
+  accepting_jobs?: boolean;
+  queued_jobs?: number;
+  supplies?: {
+    printer: string;
+    supported: boolean;
+    levels: InkLevel[];
+  };
+};
+
+export type PrintData = {
+  printers: PrinterEntry[];
+};
+
+export async function getPrintData(): Promise<PrintData> {
+  return printFromSelfModel(await getSelfModel());
+}
+
+export type DoctorProbe = {
+  code: number | null;
+  ok: boolean;
+  latency_ms: number | null;
+  error: string | null;
+};
+
+export type DoctorData = {
+  reachable: boolean;
+  probes: Record<string, DoctorProbe>;
+  all_ok?: boolean;
+};
+
+export async function getDoctorData(): Promise<DoctorData> {
+  return doctorFromSelfModel(await getSelfModel());
+}
+
+export type AgentEntry = {
+  agent_id: string;
+  status: 'available' | 'unavailable' | 'unknown';
+  description: string;
+};
+
+export type AgentsData = {
+  agents: AgentEntry[];
+};
+
+export async function getAgents(): Promise<AgentsData> {
+  const empty: AgentsData = { agents: [] };
   try {
-    const headers = new Headers();
-    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
-    const response = await fetch(`${API_URL}/self-model`, { headers });
+    const response = await fetch(`${API_URL}/self-model/agents`);
     if (!response.ok) return empty;
     const data = await response.json();
-    return data?.homelab ?? empty;
+    const raw = Array.isArray(data?.agents) ? data.agents : [];
+    const agents: AgentEntry[] = raw
+      .filter((item: unknown) => item && typeof item === 'object' && 'agent_id' in item)
+      .map((item: { agent_id: string; status?: string; description?: string }) => ({
+        agent_id: item.agent_id,
+        status: (item.status as AgentEntry['status']) || 'unknown',
+        description: item.description || '',
+      }));
+    return { agents };
   } catch {
     return empty;
+  }
+}
+
+export async function setAgentStatus(agentId: string, enabled: boolean): Promise<boolean> {
+  try {
+    const headers = new Headers({ 'Content-Type': 'application/json' });
+    const response = await fetch(`${API_URL}/self-model/agents/${agentId}/status`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ enabled }),
+    });
+    return response.ok;
+  } catch {
+    return false;
   }
 }
 
 export async function setHomelabSlot(unitId: string, catalogId: string | null): Promise<boolean> {
   try {
     const headers = new Headers({ 'Content-Type': 'application/json' });
-    if (API_KEY) headers.set('Authorization', `Bearer ${API_KEY}`);
     const response = await fetch(`${API_URL}/self-model/homelab/slots/${unitId}`, {
       method: 'POST',
       headers,
@@ -214,7 +339,35 @@ export async function sendAudio(blob: Blob) {
 export async function transcribeAudio(blob: Blob) {
   return neronFetch<{ text?: string; error?: string }>(
     '/transcribe',
-    { method: 'POST', headers: { 'content-type': blob.type }, body: blob, timeoutMs: 30000, auth: false },
+    { method: 'POST', headers: { 'content-type': blob.type }, body: blob, timeoutMs: 30000 },
     STT_URL,
   );
+}
+
+export type SystemdUnit = {
+  key: string;
+  unit: string | null;
+  group: 'applicatif' | 'peripherique' | 'externe';
+  load_state: string;
+  active_state: string;
+  sub_state: string;
+  restarts: number;
+  since: string | null;
+  main_pid: string | null;
+  registered: boolean;
+  state: 'ok' | 'unregistered' | 'orphan' | 'foreign';
+  version: string | null;
+  registry_status: string | null;
+  host: string | null;
+  port: number | null;
+};
+
+export type SystemdData = {
+  available: boolean;
+  reason?: string;
+  units: SystemdUnit[];
+};
+
+export async function getSystemdUnits(): Promise<SystemdData> {
+  return systemdFromSelfModel(await getSelfModel());
 }

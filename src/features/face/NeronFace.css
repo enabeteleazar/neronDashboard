@@ -1,0 +1,66 @@
+.neron-face {
+  --accent: #7fc4ff;
+  position: relative;
+  width: 100%;
+  height: 75%;
+  aspect-ratio: 1;
+}
+
+.neron-face canvas {
+  position: relative;
+  z-index: 1;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.neron-face__halo {
+  position: absolute;
+  inset: -12%;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--accent) 35%, transparent), transparent 62%);
+  animation: nf-halo 5s ease-in-out infinite;
+}
+
+@keyframes nf-halo {
+  0%, 100% { opacity: .45; }
+  50%      { opacity: .95; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .neron-face__halo { animation: none; }
+}
+
+/* Deplacement doux vers la zone libre, et fondu de presence multi-appareils */
+.neron-face {
+  will-change: transform, opacity;
+  transition: transform 1.2s cubic-bezier(.22, .61, .36, 1), opacity .5s ease, scale .5s ease;
+}
+
+/* Presence multi-appareils (chantier avatar_presence) : jamais demonte,
+   seulement estompe + reduit quand cet appareil n'a pas la presence — le
+   canvas WebGL reste vivant en arriere-plan, pret a revenir instantanement
+   sans recharger le VRM (14 Mo). */
+.neron-face.neron-face--hidden {
+  opacity: 0;
+  scale: .82;
+  pointer-events: none;
+}
+
+/* Plan large : l'avatar occupe toute la hauteur du cadre */
+.neron-face {
+  aspect-ratio: auto;
+  height: 100%;
+}
+
+
+/* --- mode buste dans la sidebar (branche avatar_navbar) --- */
+.neron-face.neron-face--bust {
+  inset: auto;
+  width: 190px;
+  height: 250px;
+  z-index: 3;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 66%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 66%, transparent 100%);
+}
+.neron-face.neron-face--bust .neron-face__halo { opacity: .3; }

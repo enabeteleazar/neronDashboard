@@ -1,29 +1,44 @@
-import { Activity, Bot, Cpu, Database, Home, Mic, Server, Settings, Target } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Activity, Bell, Bot, Cpu, Database, Home, MessageSquare, Mic, Printer, Server, Settings, Stethoscope, Sun, Target, Terminal, Users } from 'lucide-react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { CommandBar } from './components/CommandBar';
 import { FloatingWindow } from './components/FloatingWindow';
-import { NeronOrb, type OrbState } from './components/NeronOrb';
+// Charge three.js/@pixiv/three-vrm/r3f a l'execution seulement : ces
+// dependances pesaient a elles seules ~1,1 Mo du bundle principal.
+const NeronFace = lazy(() =>
+  import('./features/face/NeronFace').then((m) => ({ default: m.NeronFace })),
+);
+export type OrbState = 'idle' | 'thinking' | 'working' | 'alert';
 import { ConversationPanel } from './features/conversation';
 import { HomelabPanel } from './features/homelab';
+import { PrintPanel } from './features/print';
+import { DoctorPanel } from './features/doctor';
+import { AgentsPanel } from './features/agents';
 import { MemoryPanel } from './features/memory';
 import { SelfModelPanel } from './features/selfmodel';
 import { SystemPanel } from './features/system';
-import { VocalPanel } from './features/vocal';
 import { WikipediaPanel, type WikipediaData } from './features/wikipedia/WikipediaPanel';
 import { useNeronEvents } from './hooks/useNeronEvents';
 import { useNeron } from './hooks/useNeron';
 import {
   getHealth,
   getHomelabData,
-  getServices,
-  getSystemResources,
+  getSelfModel,
+  getAgents,
+  resourcesFromSelfModel,
+  homelabFromSelfModel,
+  printFromSelfModel,
+  doctorFromSelfModel,
+  systemdFromSelfModel,
   type HomelabData,
+  type PrintData,
+  type DoctorData,
+  type AgentsData,
   type NeronHealth,
-  type ServiceRegistration,
+  type SystemdData,
   type SystemResources,
 } from './lib/neronApi';
 
-type WindowId = 'conversation' | 'dashboard' | 'homelab' | 'vocal' | 'goals' | 'memory' | 'wikipedia';
+type WindowId = 'conversation' | 'dashboard' | 'homelab' | 'print' | 'doctor' | 'agents' | 'goals' | 'memory' | 'wikipedia' | 'instagram' | 'internet' | 'x' | 'facebook' | 'youtube';
 
 type WindowRuntimeState = {
   x: number;
@@ -34,39 +49,94 @@ type WindowRuntimeState = {
   z: number;
 };
 
-const initialLayout: Record<WindowId, Omit<WindowRuntimeState, 'z' | 'minimized' | 'pinned'>> = {
+type Box = Omit<WindowRuntimeState, 'z' | 'minimized' | 'pinned'>;
+
+/* Mise en page d'origine, pensee pour un grand ecran. */
+const rawLayout: Record<WindowId, Box> = {
   conversation: { x: 270, y: 110, width: 430 },
   dashboard: { x: 980, y: 110, width: 470 },
   homelab: { x: 260, y: 585, width: 430 },
-  vocal: { x: 1010, y: 610, width: 390 },
+  print: { x: 260, y: 585, width: 430 },
+  doctor: { x: 260, y: 585, width: 430 },
+  agents: { x: 260, y: 585, width: 430 },
   goals: { x: 760, y: 560, width: 370 },
-  memory: { x: 760, y: 120, width: 370 },
-  wikipedia: { x: 480, y: 160, width: 520 },
+  memory: { x: 380, y: 120, width: 820 },
+  wikipedia: { x: 940, y: 100, width: 460 },
+  internet: { x: 940, y: 100, width: 460 },
+  facebook: { x: 1420, y: 100, width: 460 },
+  instagram: { x: 1420, y: 320, width: 460 },
+  x: { x: 1420, y: 540, width: 460 },
+  youtube: { x: 1420, y: 760, width: 460 },
 };
+
+/* Ramene la mise en page dans le viewport reel : sans ca, les fenetres
+   posees a x:1420 s'ouvrent hors champ sur un ecran de 1280. */
+const GAP = 16;
+const TOP = 96;
+
+/* Doit suivre les largeurs de .sidebar definies par les @media de global.css,
+   sinon x/width sont calcules pour une sidebar plus large que celle reellement
+   affichee et les fenetres se positionnent hors du viewport sur mobile. */
+function sidebarWidthFor(vw: number): number {
+  if (vw <= 640) return 60;
+  if (vw <= 1100) return 186;
+  return 220;
+}
+
+function clampLayout(src: Record<WindowId, Box>): Record<WindowId, Box> {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const sidebarW = sidebarWidthFor(vw);
+  const out = {} as Record<WindowId, Box>;
+  (Object.keys(src) as WindowId[]).forEach((id) => {
+    const b = src[id];
+    const width = Math.max(200, Math.min(b.width, vw - sidebarW - GAP * 2));
+    const maxX = Math.max(sidebarW + GAP, vw - width - GAP);
+    const x = Math.min(Math.max(b.x, sidebarW + GAP), maxX);
+    const y = Math.min(Math.max(b.y, TOP), Math.max(TOP, vh - 220));
+    out[id] = { ...b, x, y, width };
+  });
+  return out;
+}
+
+const initialLayout: Record<WindowId, Box> = clampLayout(rawLayout);
 
 const titles: Record<WindowId, string> = {
   conversation: 'Conversation',
   dashboard: 'Système',
   homelab: 'Homelab',
-  vocal: 'Vocal',
+  print: 'Impression',
+  doctor: 'Doctor',
+  agents: 'Agents',
   goals: 'Goals',
   memory: 'Mémoire',
   wikipedia: 'Wikipédia',
+  instagram: 'Instagram',
+  internet: 'Internet',
+  x: 'X',
+  facebook: 'Facebook',
+  youtube: 'YouTube',
 };
 
-const nav = [
-  { id: 'conversation' as const, label: 'Conversation', icon: Bot },
-  { id: 'dashboard' as const, label: 'Système', icon: Cpu },
-  { id: 'homelab' as const, label: 'Homelab', icon: Server },
-  { id: 'vocal' as const, label: 'Vocal', icon: Mic },
-  { id: 'goals' as const, label: 'Goals', icon: Target },
-  { id: 'memory' as const, label: 'Mémoire', icon: Database },
+type NavItem = { id: string; label: string; icon: typeof Home; target: WindowId | null };
+
+const nav: NavItem[] = [
+  { id: 'home', label: 'Accueil', icon: Home, target: null },
+  { id: 'conversation', label: 'Conversation', icon: MessageSquare, target: 'conversation' },
+  { id: 'goals', label: 'Goals', icon: Target, target: 'goals' },
+  { id: 'agents', label: 'Agents', icon: Users, target: 'agents' },
+  { id: 'memory', label: 'Mémoire', icon: Database, target: 'memory' },
+  { id: 'system', label: 'Système', icon: Cpu, target: 'dashboard' },
+  { id: 'homelab', label: 'Homelab', icon: Server, target: 'homelab' },
+  { id: 'print', label: 'Impression', icon: Printer, target: 'print' },
+  { id: 'doctor', label: 'Doctor', icon: Stethoscope, target: 'doctor' },
+  { id: 'settings', label: 'Paramètres', icon: Settings, target: null },
 ];
 
 type SystemProps = {
   health: NeronHealth | null;
   healthError: boolean;
-  services: ServiceRegistration[] | null;
+  systemd: SystemdData | null;
 };
 
 type ConversationProps = {
@@ -78,10 +148,22 @@ type ConversationProps = {
 };
 
 type HomelabProps = {
-  services: ServiceRegistration[] | null;
   resources: SystemResources | null;
   homelab: HomelabData | null;
   onSlotSaved: () => void;
+};
+
+type PrintProps = {
+  print: PrintData | null;
+};
+
+type DoctorProps = {
+  doctor: DoctorData | null;
+};
+
+type AgentsProps = {
+  agentsData: AgentsData | null;
+  onStatusChanged: () => void;
 };
 
 function renderPanel(
@@ -90,16 +172,31 @@ function renderPanel(
   setOrbState: (s: OrbState) => void,
   system: SystemProps,
   homelab: HomelabProps,
+  print: PrintProps,
+  doctor: DoctorProps,
+  agents: AgentsProps,
   wikipedia: WikipediaData,
   conversation: ConversationProps,
+  instagram: WikipediaData,
+  internet: WikipediaData,
+  xData: WikipediaData,
+  facebookData: WikipediaData,
+  youtubeData: WikipediaData,
 ) {
   switch (id) {
     case 'dashboard': return <SystemPanel {...system} />;
     case 'homelab': return <HomelabPanel {...homelab} />;
-    case 'vocal': return <VocalPanel />;
+    case 'print': return <PrintPanel {...print} />;
+    case 'doctor': return <DoctorPanel {...doctor} />;
+    case 'agents': return <AgentsPanel {...agents} />;
     case 'goals': return <SelfModelPanel />;
     case 'memory': return <MemoryPanel />;
     case 'wikipedia': return <WikipediaPanel data={wikipedia} />;
+    case 'instagram': return <WikipediaPanel data={instagram} />;
+    case 'internet': return <WikipediaPanel data={internet} />;
+    case 'x': return <WikipediaPanel data={xData} />;
+    case 'facebook': return <WikipediaPanel data={facebookData} />;
+    case 'youtube': return <WikipediaPanel data={youtubeData} />;
     default: return <ConversationPanel setOrbState={setOrbState} {...conversation} />;
   }
 }
@@ -119,19 +216,33 @@ export function NeronConsole() {
   const [windows, setWindows] = useState<Record<WindowId, WindowRuntimeState>>(buildInitialWindows);
   const [topZ, setTopZ] = useState(20);
   const [orbState, setOrbState] = useState<OrbState>('idle');
+  const [clock, setClock] = useState(() => new Date().toLocaleTimeString('fr-FR'));
 
   const [health, setHealth] = useState<NeronHealth | null>(null);
   const [healthError, setHealthError] = useState(false);
-  const [services, setServices] = useState<ServiceRegistration[] | null>(null);
+  const [systemd, setSystemd] = useState<SystemdData | null>(null);
   const [resources, setResources] = useState<SystemResources | null>(null);
   const [homelab, setHomelab] = useState<HomelabData | null>(null);
+  const [printData, setPrintData] = useState<PrintData | null>(null);
+  const [doctorData, setDoctorData] = useState<DoctorData | null>(null);
+  const [agentsData, setAgentsData] = useState<AgentsData | null>(null);
   const [wikipedia, setWikipedia] = useState<WikipediaData>(null);
+  const [instagram, setInstagram] = useState<WikipediaData>(null);
+  const [internet, setInternet] = useState<WikipediaData>(null);
+  const [xData, setXData] = useState<WikipediaData>(null);
+  const [facebookData, setFacebookData] = useState<WikipediaData>(null);
+  const [youtubeData, setYoutubeData] = useState<WikipediaData>(null);
   const prevStatuses = useRef<Record<string, string>>({});
   const wasResourceAlert = useRef(false);
   const openWindowRef = useRef<(id: WindowId) => void>(() => {});
+  const closeWindowRef = useRef<(id: WindowId) => void>(() => {});
+  const inactivityTimerRef = useRef<number | null>(null);
 
   const lastEvent = useNeronEvents();
-  const { messages, status, isStreaming, isThinking, send, clear } = useNeron();
+  const {
+    messages, status, isStreaming, isThinking, isPresent, send, clear,
+    voiceState, voiceTranscript, voiceError, voiceToggle, voiceStart, voiceStop, voiceCancel,
+  } = useNeron();
 
   const visibleWindows = useMemo(
     () => openWindows.map((id) => ({ id, ...windows[id] })),
@@ -148,20 +259,41 @@ export function NeronConsole() {
 
   useEffect(() => {
     openWindowRef.current = openWindow;
+    closeWindowRef.current = closeWindow;
   });
 
   useEffect(() => {
     if (!lastEvent) return;
     if (lastEvent.event === 'memory.wikipedia_fallback') {
       const data = lastEvent.data as Record<string, unknown>;
-      setWikipedia({
+      const payload = {
         query: (data.query as string) ?? '',
         title: (data.title as string) ?? null,
         url: (data.url as string) ?? null,
         summary: (data.summary as string) ?? null,
         image_url: (data.image_url as string) ?? null,
-      });
-      openWindowRef.current('wikipedia');
+      };
+      if (data.source === 'instagram') {
+        setInstagram(payload);
+        openWindowRef.current('instagram');
+      } else if (data.source === 'web') {
+        setInternet(payload);
+        closeWindowRef.current('wikipedia');
+        openWindowRef.current('internet');
+      } else if (data.source === 'x') {
+        setXData(payload);
+        openWindowRef.current('x');
+      } else if (data.source === 'facebook') {
+        setFacebookData(payload);
+        openWindowRef.current('facebook');
+      } else if (data.source === 'youtube') {
+        setYoutubeData(payload);
+        openWindowRef.current('youtube');
+      } else {
+        setWikipedia(payload);
+        closeWindowRef.current('internet');
+        openWindowRef.current('wikipedia');
+      }
     }
   }, [lastEvent]);
 
@@ -173,35 +305,44 @@ export function NeronConsole() {
         .then((data) => { if (!cancelled) { setHealth(data); setHealthError(false); } })
         .catch(() => { if (!cancelled) setHealthError(true); });
 
-      getSystemResources().then((data) => {
-        if (cancelled) return;
-        setResources(data);
-        const isAlert = [data.cpu_pct, data.ram_pct, data.disk_pct].some((v) => v != null && v >= 90);
-        if (isAlert && !wasResourceAlert.current) openWindowRef.current('homelab');
-        wasResourceAlert.current = isAlert;
-      });
-
-      getHomelabData().then((data) => {
-        if (cancelled) return;
-        setHomelab(data);
-      });
-
-      getServices()
-        .then((data) => {
+      // Une seule lecture de /self-model par cycle : resources, homelab, print,
+      // doctor et systemd en derivent tous (5 requetes identiques auparavant).
+      getSelfModel()
+        .then((selfModel) => {
           if (cancelled) return;
-          const list = data.services ?? [];
+
+          const resourcesData = resourcesFromSelfModel(selfModel);
+          setResources(resourcesData);
+          const isAlert = [resourcesData.cpu_pct, resourcesData.ram_pct, resourcesData.disk_pct]
+            .some((v) => v != null && v >= 90);
+          if (isAlert && !wasResourceAlert.current) openWindowRef.current('homelab');
+          wasResourceAlert.current = isAlert;
+
+          setHomelab(homelabFromSelfModel(selfModel));
+          setPrintData(printFromSelfModel(selfModel));
+          setDoctorData(doctorFromSelfModel(selfModel));
+
+          const systemdData = systemdFromSelfModel(selfModel);
+          const units = systemdData.units ?? [];
           const nextStatuses: Record<string, string> = {};
           let changed = false;
-          for (const service of list) {
-            nextStatuses[service.service_name] = service.status;
-            const prev = prevStatuses.current[service.service_name];
-            if (prev !== undefined && prev !== service.status) changed = true;
+          for (const unit of units) {
+            nextStatuses[unit.key] = unit.active_state;
+            if (unit.group !== 'applicatif') continue;
+            const prev = prevStatuses.current[unit.key];
+            const bad = unit.active_state === 'failed' || unit.active_state === 'inactive';
+            if (prev !== undefined && prev !== unit.active_state && bad) changed = true;
           }
           prevStatuses.current = nextStatuses;
-          setServices(list);
+          setSystemd(systemdData);
           if (changed) openWindowRef.current('dashboard');
         })
-        .catch(() => { if (!cancelled) setServices(null); });
+        .catch(() => { if (!cancelled) setSystemd(null); });
+
+      getAgents().then((data) => {
+        if (cancelled) return;
+        setAgentsData(data);
+      });
     }
 
     poll();
@@ -209,11 +350,19 @@ export function NeronConsole() {
     return () => { cancelled = true; window.clearInterval(id); };
   }, []);
 
+  function resetInactivityTimer() {
+    if (inactivityTimerRef.current) window.clearTimeout(inactivityTimerRef.current);
+    inactivityTimerRef.current = window.setTimeout(() => {
+      setOpenWindows((current) => current.filter((id) => windows[id]?.pinned));
+    }, 60000);
+  }
+
   function closeWindow(id: WindowId) {
     setOpenWindows((current) => current.filter((windowId) => windowId !== id));
   }
 
   function bringToFront(id: WindowId) {
+    resetInactivityTimer();
     setTopZ((z) => {
       const nextZ = z + 1;
       setWindows((current) => ({ ...current, [id]: { ...current[id], z: nextZ } }));
@@ -222,6 +371,7 @@ export function NeronConsole() {
   }
 
   function moveWindow(id: WindowId, x: number, y: number) {
+    resetInactivityTimer();
     setWindows((current) => ({ ...current, [id]: { ...current[id], x, y } }));
   }
 
@@ -234,39 +384,111 @@ export function NeronConsole() {
   }
 
   function handleCommand(command: string) {
+    resetInactivityTimer();
     const text = command.toLowerCase();
     if (text.includes('système') || text.includes('status') || text.includes('dashboard')) return openWindow('dashboard');
     if (text.includes('homelab') || text.includes('serveur')) return openWindow('homelab');
-    if (text.includes('vocal') || text.includes('micro')) return openWindow('vocal');
     if (text.includes('goal') || text.includes('objectif')) return openWindow('goals');
     if (text.includes('mémoire') || text.includes('memory')) return openWindow('memory');
+    closeWindow('wikipedia');
+    closeWindow('internet');
+    closeWindow('instagram');
+    closeWindow('x');
+    closeWindow('facebook');
+    closeWindow('youtube');
     openWindow('conversation');
     send(command);
   }
 
+  useEffect(() => {
+    const t = window.setInterval(() => setClock(new Date().toLocaleTimeString('fr-FR')), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+
+  const cpu = Math.round(resources?.cpu_pct ?? 0);
+  const ram = Math.round(resources?.ram_pct ?? 0);
+  const disk = Math.round(resources?.disk_pct ?? 0);
+  const activity = Math.round((cpu + ram + disk) / 3);
+  const online = !healthError && status === 'connected';
+
   return (
     <main className="console-shell">
       <aside className="sidebar">
-        <button className="nav-home"><Home size={18} /> Accueil</button>
+        <div className="brand">
+          <div className="brand-orb" />
+          <div>
+            <strong>NéronOS</strong>
+            <small>Home Lab Assistant</small>
+          </div>
+        </div>
+
         <nav>
           {nav.map((item) => {
             const Icon = item.icon;
-            return <button key={item.id} onClick={() => openWindow(item.id)}><Icon size={18} /> {item.label}</button>;
+            const active = item.target !== null && openWindows.includes(item.target);
+            /* pas de fenetre associee et pas d'action : entree grisee */
+            const dead = item.target === null && item.id !== 'home';
+            return (
+              <button
+                key={item.id}
+                disabled={dead}
+                title={dead ? 'Bientot disponible' : undefined}
+                className={
+                  dead ? 'nav-item nav-item-off' : active ? 'nav-item active' : 'nav-item'
+                }
+                onClick={() => (item.target ? openWindow(item.target) : setOpenWindows([]))}
+              >
+                <Icon size={17} /> {item.label}
+              </button>
+            );
           })}
         </nav>
-        <div className="sidebar-status">
-          <Activity size={18} />
-          <div><small>Aucune Notif .</small></div>
+
+        {/* espace vide reserve : l'avatar vient s'y poser en buste */}
+        <div className="face-slot" />
+
+        <div className="sidebar-metrics">
+          <div className="metric-line"><span>Activité système</span><b>{activity}%</b></div>
+          <div className="metric-bar"><i style={{ width: activity + '%' }} /></div>
+          <div className="metric-line"><span>Charge CPU</span><b>{cpu}%</b></div>
+          <div className="metric-bar"><i style={{ width: cpu + '%' }} /></div>
+          <div className="metric-line"><span>Mémoire</span><b>{ram}%</b></div>
+          <div className="metric-bar"><i style={{ width: ram + '%' }} /></div>
+          <div className="metric-line"><span>Disque</span><b>{disk}%</b></div>
+          <div className="metric-bar"><i style={{ width: disk + '%' }} /></div>
         </div>
+
+
+        <div className="sidebar-footer">
+{/*
+          <button title="Terminal"><Terminal size={16} /></button>
+          <button title="Thème"><Sun size={16} /></button>
+*/}
+        </div>
+
       </aside>
 
       <header className="topbar">
-        <div className="wordmark">NÉRON</div>
+        <div className="wordmark-block">
+          <span className={online ? 'pill' : 'pill pill-off'}>● {online ? 'Online' : 'Offline'}</span>
+        </div>
+{/*
+        <div className="top-actions">
+          <span className="clock">{clock}</span>
+          <span className={online ? 'pill' : 'pill pill-off'}>● {online ? 'Online' : 'Offline'}</span>
+          <button title="Notifications"><Bell size={17} /></button>
+          <button title="Paramètres"><Settings size={17} /></button>
+        </div>
+*/}
       </header>
 
-      <section className="orb-zone">
-        <NeronOrb state={orbState} />
-      </section>
+      <div className={'orb-zone orb-' + orbState}>
+        <div className="orb-stage">
+          <Suspense fallback={null}>
+            <NeronFace state={orbState} bust present={isPresent} />
+          </Suspense>
+        </div>
+      </div>
 
       {visibleWindows.map((win) => (
         <FloatingWindow
@@ -284,11 +506,31 @@ export function NeronConsole() {
           onFocus={() => bringToFront(win.id)}
           onMove={(x, y) => moveWindow(win.id, x, y)}
         >
-          {renderPanel(win.id, orbState, setOrbState, { health, healthError, services }, { services, resources, homelab, onSlotSaved: () => getHomelabData().then(setHomelab) }, wikipedia, { messages, status, isStreaming, isThinking, clear })}
+          {renderPanel(win.id, orbState, setOrbState, { health, healthError, systemd }, { resources, homelab, onSlotSaved: () => getHomelabData().then(setHomelab) }, { print: printData }, { doctor: doctorData }, { agentsData, onStatusChanged: () => getAgents().then(setAgentsData) }, wikipedia, { messages, status, isStreaming, isThinking, clear }, instagram, internet, xData, facebookData, youtubeData)}
         </FloatingWindow>
       ))}
 
-      <CommandBar onCommand={handleCommand} />
+      <CommandBar
+        onCommand={handleCommand}
+        voiceState={voiceState}
+        voiceTranscript={voiceTranscript}
+        voiceError={voiceError}
+        voiceToggle={voiceToggle}
+        voiceStart={voiceStart}
+        voiceStop={voiceStop}
+        voiceCancel={voiceCancel}
+      />
+{/*
+      <div className="dock">
+        <button title="Conversation" onClick={() => openWindow('conversation')}><MessageSquare size={19} /></button>
+        <button title="Goals" onClick={() => openWindow('goals')}><Target size={19} /></button>
+        <button title="Agents" disabled><Bot size={19} /></button>
+        <button className="dock-orb" title="Accueil" onClick={() => setOpenWindows([])} />
+        <button title="Mémoire" onClick={() => openWindow('memory')}><Database size={19} /></button>
+        <button title="Homelab" onClick={() => openWindow('homelab')}><Server size={19} /></button>
+        <button title="Système" onClick={() => openWindow('dashboard')}><Cpu size={19} /></button>
+      </div>
+*/}
     </main>
   );
 }

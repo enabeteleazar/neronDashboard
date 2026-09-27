@@ -1,13 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { ChatMessage, ConnectionStatus } from '../../lib/neronApi';
-import type { OrbState } from '../../components/NeronOrb';
-
-const STATUS_LABEL: Record<string, string> = {
-  connecting: 'Connexion…',
-  connected: 'Connecté',
-  disconnected: 'Déconnecté — reconnexion…',
-  error: 'Erreur de connexion',
-};
+import type { OrbState } from '../../NeronConsole';
 
 type ConversationProps = {
   setOrbState: (s: OrbState) => void;
@@ -40,7 +33,6 @@ export function ConversationPanel({
 
   return (
     <div className="conversation-shell">
-      <div className={`conversation-status status-${status}`}>{STATUS_LABEL[status] ?? status}</div>
 
       <div className="conversation-panel">
         {messages.length === 0 && (

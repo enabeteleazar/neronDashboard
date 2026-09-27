@@ -1,13 +1,56 @@
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import react from '@vitejs/plugin-react'
+import { visualizer } from 'rollup-plugin-visualizer';
+import { readFileSync } from 'node:fs';
+
+// Source unique des secrets : le fichier designe par NERON_SECRETS_PATH,
+// fourni par l'unite systemd. Aucune cle ne doit vivre dans .env.
+const SECRETS_PATH = process.env.NERON_SECRETS_PATH ?? '/etc/neronOS/secrets.env';
+
+function readSecret(name: string): string {
+  try {
+    for (const raw of readFileSync(SECRETS_PATH, 'utf8').split('\n')) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#')) continue;
+      const eq = line.indexOf('=');
+      if (eq === -1) continue;
+      if (line.slice(0, eq).trim() !== name) continue;
+      return line.slice(eq + 1).trim().replace(/^["']|["']$/g, '');
+    }
+  } catch (error) {
+    console.warn(`[neron] secrets illisibles (${SECRETS_PATH}) :`, (error as Error).message);
+  }
+  return '';
+}
+
+// Utilisee uniquement pour le handshake WS (gateway.auth). L'authentification
+// REST vers le Core (Authorization: Bearer) est injectee cote Caddy sur le
+// reverse proxy /api/* — cette cle ne doit JAMAIS finir dans le bundle pour
+// cet usage (voir system/deploy/caddy/Caddyfile).
+const gatewayToken = readSecret('NERON_API_KEY');
+if (!gatewayToken) {
+  console.warn('[neron] ATTENTION : NERON_API_KEY introuvable, le WS gateway.auth echouera');
+}
 
 export default defineConfig({
-  plugins: [react()],
+  // Le Dashboard est servi sous /dashboard/ par Caddy : les assets doivent
+  // etre emis avec ce prefixe, sinon 404 sur tout le bundle.
+  base: '/dashboard/',
+  // visualizer genere dist/stats.html : utile en analyse ponctuelle (ANALYZE=1),
+  // mais couteux (plusieurs secondes) si execute a chaque build de prod — il a
+  // contribue a un depassement du timeout de demarrage systemd (start-pre).
+  plugins: [
+    react(),
+    ...(process.env.ANALYZE ? [visualizer({ filename: 'dist/stats.html', gzipSize: true, brotliSize: true })] : []),
+  ],
+  define: {
+    'import.meta.env.VITE_NERON_TOKEN': JSON.stringify(gatewayToken),
+  },
   server: {
     port: 8080,
     host: '0.0.0.0',
-    // Nécessaire depuis Vite 6 (protection anti DNS-rebinding) pour accepter
-    // les requêtes arrivant via le reverse proxy Tailscale Serve (Host
+    // Necessaire depuis Vite 6 (protection anti DNS-rebinding) pour accepter
+    // les requetes arrivant via le reverse proxy Tailscale Serve (Host
     // header = homebox.tail7f8e60.ts.net), en plus de localhost/IP locales.
     allowedHosts: ['homebox.tail7f8e60.ts.net'],
   }
