@@ -13,6 +13,12 @@ export const MEMORY_URL = '/memoire';
 // un acces direct sur :4400 ne fonctionnera pas.
 export const WS_URL = 'wss://' + window.location.host + '/ws/';
 
+// Comme WS_URL, mais route vers /api/* (Core) plutot que vers la gateway
+// /ws/* -- utilise par neronShop (live view Amazon). L'authentification est
+// injectee par Caddy sur l'upgrade WebSocket exactement comme pour les
+// requetes REST /api/* : rien a transmettre depuis le navigateur ici.
+export const API_WS_URL = 'wss://' + window.location.host + '/api';
+
 // La cle Core (NERON_API_KEY) n'est plus livree au navigateur : Caddy
 // l'injecte cote serveur sur le reverse proxy /api/*. Voir
 // system/deploy/caddy/Caddyfile.

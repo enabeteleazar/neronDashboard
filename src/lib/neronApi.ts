@@ -371,3 +371,31 @@ export type SystemdData = {
 export async function getSystemdUnits(): Promise<SystemdData> {
   return systemdFromSelfModel(await getSelfModel());
 }
+
+/* ------------------------------------------------------------------ */
+/* neronShop -- live view Amazon                                       */
+/* ------------------------------------------------------------------ */
+
+export type ShopLiveSession = {
+  session_id: string;
+};
+
+export async function createShopLiveSession(startUrl = 'https://www.amazon.fr') {
+  return neronFetch<ShopLiveSession>('/shop/live/sessions', {
+    method: 'POST',
+    body: JSON.stringify({ start_url: startUrl }),
+    timeoutMs: 20000,
+  });
+}
+
+export type ShopLiveComplete = {
+  status: string;
+  storage_state_path: string;
+};
+
+export async function completeShopLiveSession(sessionId: string) {
+  return neronFetch<ShopLiveComplete>(`/shop/live/sessions/${sessionId}/complete`, {
+    method: 'POST',
+    timeoutMs: 20000,
+  });
+}

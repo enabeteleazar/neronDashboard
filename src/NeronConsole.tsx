@@ -1,4 +1,4 @@
-import { Activity, Bell, Bot, Cpu, Database, Home, MessageSquare, Mic, Printer, Server, Settings, Stethoscope, Sun, Target, Terminal, Users } from 'lucide-react';
+import { Activity, Bell, Bot, Cpu, Database, Home, MessageSquare, Mic, Printer, Server, Settings, ShoppingCart, Stethoscope, Sun, Target, Terminal, Users } from 'lucide-react';
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { CommandBar } from './components/CommandBar';
 import { FloatingWindow } from './components/FloatingWindow';
@@ -13,6 +13,7 @@ import { HomelabPanel } from './features/homelab';
 import { PrintPanel } from './features/print';
 import { DoctorPanel } from './features/doctor';
 import { AgentsPanel } from './features/agents';
+import { ShopLivePanel } from './features/shop';
 import { MemoryPanel } from './features/memory';
 import { SelfModelPanel } from './features/selfmodel';
 import { SystemPanel } from './features/system';
@@ -38,7 +39,7 @@ import {
   type SystemResources,
 } from './lib/neronApi';
 
-type WindowId = 'conversation' | 'dashboard' | 'homelab' | 'print' | 'doctor' | 'agents' | 'goals' | 'memory' | 'wikipedia' | 'instagram' | 'internet' | 'x' | 'facebook' | 'youtube';
+type WindowId = 'conversation' | 'dashboard' | 'homelab' | 'print' | 'doctor' | 'agents' | 'goals' | 'memory' | 'wikipedia' | 'instagram' | 'internet' | 'x' | 'facebook' | 'youtube' | 'shop';
 
 type WindowRuntimeState = {
   x: number;
@@ -59,6 +60,7 @@ const rawLayout: Record<WindowId, Box> = {
   print: { x: 260, y: 585, width: 430 },
   doctor: { x: 260, y: 585, width: 430 },
   agents: { x: 260, y: 585, width: 430 },
+  shop: { x: 260, y: 585, width: 480 },
   goals: { x: 760, y: 560, width: 370 },
   memory: { x: 380, y: 120, width: 820 },
   wikipedia: { x: 940, y: 100, width: 460 },
@@ -108,6 +110,7 @@ const titles: Record<WindowId, string> = {
   print: 'Impression',
   doctor: 'Doctor',
   agents: 'Agents',
+  shop: 'neronShop',
   goals: 'Goals',
   memory: 'Mémoire',
   wikipedia: 'Wikipédia',
@@ -129,6 +132,7 @@ const nav: NavItem[] = [
   { id: 'system', label: 'Système', icon: Cpu, target: 'dashboard' },
   { id: 'homelab', label: 'Homelab', icon: Server, target: 'homelab' },
   { id: 'print', label: 'Impression', icon: Printer, target: 'print' },
+  { id: 'shop', label: 'neronShop', icon: ShoppingCart, target: 'shop' },
   { id: 'doctor', label: 'Doctor', icon: Stethoscope, target: 'doctor' },
   { id: 'settings', label: 'Paramètres', icon: Settings, target: null },
 ];
@@ -189,6 +193,7 @@ function renderPanel(
     case 'print': return <PrintPanel {...print} />;
     case 'doctor': return <DoctorPanel {...doctor} />;
     case 'agents': return <AgentsPanel {...agents} />;
+    case 'shop': return <ShopLivePanel />;
     case 'goals': return <SelfModelPanel />;
     case 'memory': return <MemoryPanel />;
     case 'wikipedia': return <WikipediaPanel data={wikipedia} />;
