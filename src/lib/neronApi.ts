@@ -355,7 +355,7 @@ export type SystemdUnit = {
   since: string | null;
   main_pid: string | null;
   registered: boolean;
-  state: 'ok' | 'unregistered' | 'orphan' | 'foreign';
+  state: 'ok' | 'unregistered' | 'orphan' | 'foreign' | 'remote';
   version: string | null;
   registry_status: string | null;
   host: string | null;

@@ -38,6 +38,7 @@ function stateLabel(unit: SystemdUnit): string {
     case 'unregistered': return 'Non inscrit';
     case 'orphan': return 'Orphelin';
     case 'foreign': return 'Tiers';
+    case 'remote': return 'Distant';
     default: return 'Inconnu';
   }
 }
